@@ -6,11 +6,13 @@ source('heatmap.plus.R') #Houtan's heatmat function??
 #tothill.d1 <- exprs(tothill$`GSE9891_series_matrix-1.txt.gz`)
 #tothill.d2 <- exprs(tothill$`GSE9891_series_matrix-2.txt.gz`)
 #all(dimnames(tothill.d1)[[1]]==dimnames(tothill.d2)[[1]])
+##combined 
 #tothill.d <- cbind(tothill.d1, tothill.d2)
+## uses phenoData method on one particular object of the tothill list and access the data slot(a.k.a. attribute)
 #tothill.s1 <- phenoData(tothill$`GSE9891_series_matrix-1.txt.gz`)@data
 #tothill.s2 <- phenoData(tothill$`GSE9891_series_matrix-2.txt.gz`)@data
 #all(names(tothill.s1)==names(tothill.s2))
-#tothill.s <- rbind(tothill.s1, tothill.s2)
+#tothill.s <- rbind(tothill.s1, tothill.s2) ##This is metadata!
 #
 ###GSE6008 - 103 samples
 #gse6008 <- getGEO("GSE6008")
@@ -31,6 +33,8 @@ source('heatmap.plus.R') #Houtan's heatmat function??
 #gse7307.s <- rbind(gse7307.disease, gse7307.endo.normal)
 #
 
+##TODO - get more datasets
+##GSE3151 - Bild et al. Oncogene Signature Dataset
 ##GSE5108
 
 #dataframe <- NULL
@@ -48,7 +52,7 @@ source('heatmap.plus.R') #Houtan's heatmat function??
 #		test <- getGEO(as.character(gse7307.s[i,1]))
 #		test.d <- Table(test)
 #		test.d[,2] <- as.numeric(test.d[,2])
-#		dimnames(test.d)[[2]] <- c("ID_REF",as.character(gse7307.s[i,1]))
+ho		dimnames(test.d)[[2]] <- c("ID_REF",as.character(gse7307.s[i,1]))
 #		dataframe = merge(dataframe, test.d, by.x="ID_REF", by.y="ID_REF")
 #		#print("ELSE") #Debug
 #	}
@@ -75,8 +79,14 @@ source('heatmap.plus.R') #Houtan's heatmat function??
 ###start from here#####
 setwd("/data/htorres/kate")
 load(file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
-##src signature
-src <- read.delim(file="bild.src.txt")
+## prepare Src signature data frame
+Src.signature = read.table('src_signature.txt', sep='\t') # src_signature.txt from suplemental table1
+colnames(Src.signature) = c('ProbeID', 'GeneSymbol', 'Description', 'LocusLink', 'FoldChange')
+Src.signature$downregulated = Src.Signature$FoldChange < 1
+Src.signature$upregulated = Src.Signature$FoldChange > 1
+
+##src signature #Bild et al. 2006
+src <- read.delim(file="bild.src.txt") #where did this file come from? Maybe GSE3151
 length(intersect(src[,1], dimnames(tothill.d)[[1]]))
 length(intersect(src[,1], dimnames(gse6008.d)[[1]]))
 length(intersect(src[,1], dimnames(gse7305.d)[[1]]))
@@ -110,7 +120,7 @@ source("heatmap.plus.R")
 source(file="Func_List.r")
 library(matlab)
 
-##cleanup sample manifest
+##cleanup sample manifest #metadata)
 tothill.nn <- strsplit(as.character(tothill.s$characteristics_ch1), " : ")
 tothill.nnn <- as.data.frame(as.character(unlist(lapply((tothill.nn), "[", 2) )))
 tothill.s$characteristics_ch1a <- tothill.nnn[,1]
@@ -420,4 +430,4 @@ diff.genes.hv<-heatmap.plus(
 		#labCol=NA
 		labRow=NA
 )
-dev.off()
+#dev.off()
