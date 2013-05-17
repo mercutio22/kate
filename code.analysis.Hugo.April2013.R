@@ -1,4 +1,5 @@
 library(GEOquery)
+library(heatmap.plus)
 source('heatmap.plus.R') #Houtan's heatmat function??
 
 ###tothill data
@@ -52,7 +53,7 @@ source('heatmap.plus.R') #Houtan's heatmat function??
 #		test <- getGEO(as.character(gse7307.s[i,1]))
 #		test.d <- Table(test)
 #		test.d[,2] <- as.numeric(test.d[,2])
-ho		dimnames(test.d)[[2]] <- c("ID_REF",as.character(gse7307.s[i,1]))
+#		dimnames(test.d)[[2]] <- c("ID_REF",as.character(gse7307.s[i,1]))
 #		dataframe = merge(dataframe, test.d, by.x="ID_REF", by.y="ID_REF")
 #		#print("ELSE") #Debug
 #	}
@@ -181,6 +182,7 @@ color.map.gse6364.type <- function(mol.biol) {
 	else if (mol.biol=="Early Secretory Phase Normal") "red" #red
 	else "#FFFFFF"
 } #
+
 #tothill.type
 tothill.src.type<-apply(as.matrix(names(tothill.src[,tothill.s.sort[,1]])),1,func.list$vlookup,tothill.s[,c("geo_accession","characteristics_ch1a")],"characteristics_ch1a")
 tothill.src.type<-as.character(tothill.src.type)
@@ -292,8 +294,9 @@ gse6008.hv<-heatmap.plus(
 )
 dev.off()
 png(filename = "gse7305.src.png", bg="white", res=300, width=3000, height=3000)
+## This block is new ####
 tttt <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
-tttt <- tttt[-4,]
+tttt <- tttt[-4,]  #"it refers to the 1556499_s_ati probe" an outlier that skews the coloring!
 tttt <- as.data.frame(tttt);
 tttt <- log2(tttt);
 tttt.n <- apply(tttt[,1:10], 1, mean, na.rm=T); tttt$mean.N <- tttt.n
@@ -301,7 +304,8 @@ tttt.t <- apply(tttt[,11:20], 1, mean, na.rm=T); tttt$mean.T <- tttt.t
 pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 tttt$p.value <- as.numeric(pv)
 tttt$FC <- tttt$mean.T - tttt$mean.N
-func.list$volcano(tttt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium vs Normal (GSE7305)", cut.line = -log10(0.05), foldcut = 0.5)
+func.list$volcano(tttt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium vs Normal (GSE7305)", cut.line = -log10(0.05), foldcut = 0.5) ##Fails silently ??
+#########################
 gse7305.hv<-heatmap.plus(
 		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
 		#as.matrix(temp[,(as.character(cl.sort[,1]))]),
@@ -330,7 +334,7 @@ gse7305.hv<-heatmap.plus(
 dev.off()
 png(filename = "gse7307.src.png", bg="white", res=300, width=3000, height=3000)
 tt <- as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])])
-tt <- tt[-4,]
+tt <- tt[-4,] # removed "1556499_s_at"
 tt <- as.data.frame(tt);
 tt <- log2(tt);
 gse7307.norm <- as.character(subset(gse7307.s.sort, characteristics_ch1a=="endometrium")$Sample)
@@ -340,7 +344,8 @@ tt.t <- apply(tt[,gse7307.tum], 1, mean, na.rm=T); tt$mean.T <- tt.t
 pv.tt <- apply(tt, 1, func.list$studentT, s1=c(gse7307.norm),s2=c(gse7307.tum))
 tt$p.value <- as.numeric(pv.tt)
 tt$FC <- tt$mean.T - tt$mean.N
-func.list$volcano(tt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium/Ovary vs Normal (GSE7307)", cut.line = -log10(0.05), foldcut = 0.5)
+func.list$volcano(tt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium/Ovary vs Normal (GSE7307)", cut.line = -log10(0.05), foldcut = 0.5) # Fails silently??
+
 gse7307.hv<-heatmap.plus(
 		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
 		#as.matrix(temp[,(as.character(cl.sort[,1]))]),
@@ -367,11 +372,13 @@ gse7307.hv<-heatmap.plus(
 		labRow=NA
 )
 dev.off()
+## PROBLEM 'ColSideColors' dim()[2] must be of length ncol(x)
 png(filename = "gse6364.src.png", bg="white", res=300, width=3000, height=3000)
 ttt <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
-ttt <- ttt[-4,]
+ttt <- ttt[-4,] # outlier
 ttt <- as.data.frame(ttt);
 ttt <- log2(ttt);
+### This block is different
 ttt.n <- apply(ttt[,as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])], 1, mean, na.rm=T); ttt$mean.N <- ttt.n
 ttt.t <- apply(ttt[,as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])], 1, mean, na.rm=T); ttt$mean.T <- ttt.t
 pv.ttt <- apply(ttt, 1, func.list$studentT, s1=c(as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])),s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])))
