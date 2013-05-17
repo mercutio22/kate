@@ -85,9 +85,9 @@ load(file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
 ## New Src signature data frame
 Src.signature = read.table('src_signature.txt', sep='\t') # src_signature.txt from suplemental table1
 colnames(Src.signature) = c('ProbeID', 'GeneSymbol', 'Description', 'LocusLink', 'FoldChange')
-Src.signature$direction <- NA
-Src.signature$direction[Src.signature$FoldChange<=1] <- c("DN")
-Src.signature$direction[Src.signature$FoldChange>1] <- c("UP")
+Src.sig$direction <- NA
+Src.signature$direction[Src.signature$FoldChange<=1] <- c("DN.BILD") # just to denote this info is not from our analysis (BILD) 
+Src.signature$direction[Src.signature$FoldChange>1] <- c("UP.BILD")
 ##src signature #Bild et al. 2006
 src <- read.delim(file="bild.src.txt") #where did this file come from? Maybe GSE3151
 length(intersect(src[,1], dimnames(tothill.d)[[1]]))
@@ -299,6 +299,8 @@ gse6008.hv<-heatmap.plus(
 )
 dev.off()
 png(filename = "gse7305.src.png", bg="white", res=300, width=3000, height=3000)
+
+
 ## This block is new ####
 tttt <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
 tttt <- tttt[-4,]  #"it refers to the 1556499_s_ati probe" an outlier that skews the coloring!
@@ -309,18 +311,49 @@ tttt.t <- apply(tttt[,11:20], 1, mean, na.rm=T); tttt$mean.T <- tttt.t
 pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 tttt$p.value <- as.numeric(pv)
 tttt$FC <- tttt$mean.T - tttt$mean.N
-func.list$volcano(tttt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium vs Normal (GSE7305)", cut.line = -log10(0.05), foldcut = 0.5) ##Fails silently ??
-#########################
+func.list$volcano(tttt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium vs Normal (GSE7305)", cut.line = -log10(0.05), foldcut = 0.5) 
+tttt$direction <- NA
+tttt$direction[tttt$FC<0] <- c("DN.KL") # comes from our analylisis ( KL ) 
+tttt$direction[tttt$FC>=0] <- c("UP.KL")  
+tttt$id <- dimnames(tttt)[[1]]
+tttt$label[tttt$p.value<=0.05] <- c("Significant")
+src.sig <- merge(tttt, Src.signature, by.x = 'id', by.y = 'ProbeID', all.x = T) 
+
+#this table compares our analysis with Bilds's
+tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
+
+# DONT FORGET TO PLOT ONLY THE SAMPLE COLUMNS
+# Plot rowsidecolors for ours, and bild most differentially expressed genes 
+
+#rowsidecolors
+bildColors.colorize <- function(abbrv){ 
+	if (abbrv == 'UP.BILD') 'red'
+	else if (abbrv == 'DN.BILD') 'blue'
+	else '#FFFFFF' 
+} 
+
+klColors.colorize = function(abbrv){
+	if (abbrv == 'UP.KL') 'red'
+	else if (abbrv == 'DN.KL') 'blue'
+	else '#FFFFFF'
+}
+
+bildColors = unlist(lapply(src.sig$direction.y, bildColors.colorize))
+klColors = unlist(lapply(src.sig$direction.x, klColors.colorize))
+colors = cbind(bildColors,klColors)
+
+
 gse7305.hv<-heatmap.plus(
 		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
 		#as.matrix(temp[,(as.character(cl.sort[,1]))]),
 		#as.matrix(gse7305.src[,gse7305.s.sort[,1]]), 
-		as.matrix(tttt[,1:20]),#TODO select
+		as.matrix(tttt[,1:20]),
 		#temp.cc,
 		na.rm=TRUE,
 		scale="none",
 		#RowSideColor=probe.cc,
 		ColSideColors=cc.col.gse7305,
+		RowSideColors=colors,
 		col=jet.colors(75),
 		#key=FALSE,
 		symkey=FALSE,
