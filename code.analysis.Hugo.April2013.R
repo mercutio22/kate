@@ -1,6 +1,6 @@
 library(GEOquery)
-library(heatmap.plus)
 source('heatmap.plus.R') #Houtan's heatmat function??
+library(heatmap.plus)
 
 ###tothill data
 #tothill <- getGEO("GSE9891")
@@ -80,12 +80,14 @@ source('heatmap.plus.R') #Houtan's heatmat function??
 ###start from here#####
 setwd("/data/htorres/kate")
 load(file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
-## prepare Src signature data frame
+
+
+## New Src signature data frame
 Src.signature = read.table('src_signature.txt', sep='\t') # src_signature.txt from suplemental table1
 colnames(Src.signature) = c('ProbeID', 'GeneSymbol', 'Description', 'LocusLink', 'FoldChange')
-Src.signature$downregulated = Src.Signature$FoldChange < 1
-Src.signature$upregulated = Src.Signature$FoldChange > 1
-
+Src.signature$direction <- NA
+Src.signature$direction[Src.signature$FoldChange<=1] <- c("DN")
+Src.signature$direction[Src.signature$FoldChange>1] <- c("UP")
 ##src signature #Bild et al. 2006
 src <- read.delim(file="bild.src.txt") #where did this file come from? Maybe GSE3151
 length(intersect(src[,1], dimnames(tothill.d)[[1]]))
@@ -204,13 +206,16 @@ colnames(cc.col.gse6008) = c("GSE6008")
 cc.col.gse6008 <- cbind(cc.col.gse6008, cc.col.gse6008)
 
 
-#gse6364.type
+#gse6364.type ##PROBLEM: the resulting dataframe is 37 by 2 - heatmap expects 41 by 2
 gse6364.src.type<-apply(as.matrix(names(gse6364.src[,gse6364.s.sort[,1]])),1,func.list$vlookup,gse6364.s[,c("geo_accession","characteristics_ch1a")],"characteristics_ch1a")
 gse6364.src.type<-as.character(gse6364.src.type)
 gse6364.src.type[is.na(gse6364.src.type)]<-c("0")
 cc.gse6364.src.type<-unlist(lapply(gse6364.src.type, color.map.gse6364.type))
 
-cc.col.gse6364<-matrix(as.character(c(cc.gse6364.src.type)), nrow=37,ncol=1)
+cc.col.gse6364<-matrix(as.character(c(cc.gse6364.src.type)), 
+	nrow=37,
+	#nrow=41,
+	ncol=1)
 colnames(cc.col.gse6364) = c("GSE6364")
 cc.col.gse6364 <- cbind(cc.col.gse6364, cc.col.gse6364)
 
@@ -372,19 +377,19 @@ gse7307.hv<-heatmap.plus(
 		labRow=NA
 )
 dev.off()
-## PROBLEM 'ColSideColors' dim()[2] must be of length ncol(x)
 png(filename = "gse6364.src.png", bg="white", res=300, width=3000, height=3000)
 ttt <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
 ttt <- ttt[-4,] # outlier
 ttt <- as.data.frame(ttt);
-ttt <- log2(ttt);
-### This block is different
-ttt.n <- apply(ttt[,as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])], 1, mean, na.rm=T); ttt$mean.N <- ttt.n
-ttt.t <- apply(ttt[,as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])], 1, mean, na.rm=T); ttt$mean.T <- ttt.t
-pv.ttt <- apply(ttt, 1, func.list$studentT, s1=c(as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])),s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])))
-ttt$p.value <- as.numeric(pv.ttt)
-ttt$FC <- ttt$mean.T - ttt$mean.N
-func.list$volcano(ttt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium/Ovary vs Normal (GSE6364)", cut.line = -log10(0.05), foldcut = 0.5)
+#ttt <- log2(ttt);
+#### This dataset has a variety of tumors and normals. We need to select only the relevant ones
+#ttt.n <- apply(ttt[,as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])], 1, mean, na.rm=T); ttt$mean.N <- ttt.n
+#ttt.t <- apply(ttt[,as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])], 1, mean, na.rm=T); ttt$mean.T <- ttt.t
+#pv.ttt <- apply(ttt, 1, func.list$studentT, s1=c(as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])),s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])))
+#ttt$p.value <- as.numeric(pv.ttt)
+#ttt$FC <- ttt$mean.T - ttt$mean.N
+#func.list$volcano(ttt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium/Ovary vs Normal (GSE6364)", cut.line = -log10(0.05), foldcut = 0.5)
+### PROBLEM 'ColSideColors' dim()[2] must be of length ncol(x)
 gse6364.hv<-heatmap.plus(
 		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
 		#as.matrix(temp[,(as.character(cl.sort[,1]))]),
