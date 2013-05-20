@@ -1,6 +1,8 @@
 library(GEOquery)
 source('heatmap.plus.R') #Houtan's heatmat function??
 library(heatmap.plus)
+source(file="Func_List.r")
+library(matlab)
 
 ###tothill data
 #tothill <- getGEO("GSE9891")
@@ -9,7 +11,8 @@ library(heatmap.plus)
 #all(dimnames(tothill.d1)[[1]]==dimnames(tothill.d2)[[1]])
 ##combined 
 #tothill.d <- cbind(tothill.d1, tothill.d2)
-## uses phenoData method on one particular object of the tothill list and access the data slot(a.k.a. attribute)
+## uses phenoData method on one particular object of the tothill list and 
+##access the data slot(a.k.a. attribute)
 #tothill.s1 <- phenoData(tothill$`GSE9891_series_matrix-1.txt.gz`)@data
 #tothill.s2 <- phenoData(tothill$`GSE9891_series_matrix-2.txt.gz`)@data
 #all(names(tothill.s1)==names(tothill.s2))
@@ -118,10 +121,6 @@ sort.data.frame <- function(x, key, ...) {
 	}
 }
 
-library(heatmap.plus)
-source("heatmap.plus.R")
-source(file="Func_List.r")
-library(matlab)
 
 ##cleanup sample manifest #metadata)
 tothill.nn <- strsplit(as.character(tothill.s$characteristics_ch1), " : ")
@@ -135,22 +134,31 @@ gse6008.s$characteristics_ch1a <- gse6008.nnn[,1]
 
 gse6364.s$characteristics_ch1a <- gse6364.s$characteristics_ch1
 
-gse7307.s$characteristics_ch1a <- gse7307.s$Tissue.Cell.Line..C. ## endometrium is normal & endometrium/ovary is diseased
+## endometrium is normal & endometrium/ovary is diseased
+gse7307.s$characteristics_ch1a <- gse7307.s$Tissue.Cell.Line..C. 
 
 gse7305.nn <- strsplit(as.character(gse7305.s$characteristics_ch1), " ")
 gse7305.nnn <- as.data.frame(as.character(unlist(lapply((gse7305.nn), "[", 1) )))
 gse7305.s$characteristics_ch1a <- gse7305.nnn[,1]
 
 
-tothill.s.sort <- sort.data.frame(tothill.s[,c("geo_accession","characteristics_ch1a")], key = "characteristics_ch1a")
-gse6008.s.sort <- sort.data.frame(gse6008.s[,c("geo_accession","characteristics_ch1a")], key = "characteristics_ch1a")
-gse6364.s.sort <- sort.data.frame(gse6364.s[,c("geo_accession","characteristics_ch1a")], key = "characteristics_ch1a")
-gse7307.s.sort <- sort.data.frame(gse7307.s[,c("Sample","characteristics_ch1a")], key = "characteristics_ch1a")
-gse7305.s.sort <- sort.data.frame(gse7305.s[,c("geo_accession","characteristics_ch1a")], key = "characteristics_ch1a")
+tothill.s.sort <- sort.data.frame(tothill.s[,c("geo_accession","characteristics_ch1a")], 
+	key = "characteristics_ch1a")
+gse6008.s.sort <- sort.data.frame(gse6008.s[,c("geo_accession","characteristics_ch1a")], 
+	key = "characteristics_ch1a")
+gse6364.s.sort <- sort.data.frame(gse6364.s[,c("geo_accession","characteristics_ch1a")], 
+	key = "characteristics_ch1a")
+gse7307.s.sort <- sort.data.frame(gse7307.s[,c("Sample","characteristics_ch1a")], 
+key = "characteristics_ch1a")
+gse7305.s.sort <- sort.data.frame(gse7305.s[,c("geo_accession","characteristics_ch1a")], 
+	key = "characteristics_ch1a")
 
 #tothill.gse6008.src <- cbind(tothill.d[gse6008.src.probe,], gse6008.d[gse6008.src.probe,]); tothill.gse6008.src <- as.data.frame(tothill.gse6008.src) ## combining two dataset on common src probe
 
 #tothill.gse6008.src.sort <- tothill.gse6008.src[,c(tothill.s.sort[,1],gse6008.s.sort[,1])]
+
+
+## ColSideColors
 color.map.tothill.type <- function(mol.biol) {
 	if (mol.biol=="Fallopian") "green" #green
 	else if (mol.biol=="Ovary") "red" #red
@@ -184,6 +192,19 @@ color.map.gse6364.type <- function(mol.biol) {
 	else if (mol.biol=="Early Secretory Phase Normal") "red" #red
 	else "#FFFFFF"
 } #
+
+#rowsidecolors 
+bildColors.colorize <- function(abbrv){ 
+	if (abbrv == 'UP.BILD') 'red'
+	else if (abbrv == 'DN.BILD') 'blue'
+	else '#FFFFFF' #insignificant cases 
+} 
+
+klColors.colorize = function(abbrv){
+	if (abbrv == 'UP.KL') 'red'
+	else if (abbrv == 'DN.KL') 'blue'
+	else '#FFFFFF' #insignificant cases
+}
 
 #tothill.type
 tothill.src.type<-apply(as.matrix(names(tothill.src[,tothill.s.sort[,1]])),1,func.list$vlookup,tothill.s[,c("geo_accession","characteristics_ch1a")],"characteristics_ch1a")
@@ -220,7 +241,13 @@ colnames(cc.col.gse6364) = c("GSE6364")
 cc.col.gse6364 <- cbind(cc.col.gse6364, cc.col.gse6364)
 
 #gse7305.type
-gse7305.src.type<-apply(as.matrix(names(gse7305.src[,gse7305.s.sort[,1]])),1,func.list$vlookup,gse7305.s[,c("geo_accession","characteristics_ch1a")],"characteristics_ch1a")
+gse7305.src.type<-apply(
+	as.matrix(names(gse7305.src[,gse7305.s.sort[,1]])),
+	1,
+	func.list$vlookup,
+	gse7305.s[,c("geo_accession","characteristics_ch1a")],
+	"characteristics_ch1a"
+	)
 gse7305.src.type<-as.character(gse7305.src.type)
 gse7305.src.type[is.na(gse7305.src.type)]<-c("0")
 cc.gse7305.src.type<-unlist(lapply(gse7305.src.type, color.map.gse7305.type))
@@ -231,7 +258,13 @@ cc.col.gse7305 <- cbind(cc.col.gse7305, cc.col.gse7305)
 
 
 #gse7307.type
-gse7307.src.type<-apply(as.matrix(names(gse7307.src[,as.character(gse7307.s.sort[,1])])),1,func.list$vlookup,gse7307.s[,c("Sample","characteristics_ch1a")],"characteristics_ch1a")
+gse7307.src.type<-apply(
+	as.matrix(names(gse7307.src[,as.character(gse7307.s.sort[,1])])),
+	1,
+	func.list$vlookup,
+	gse7307.s[,c("Sample","characteristics_ch1a")],
+	"characteristics_ch1a"
+	)
 gse7307.src.type<-as.character(gse7307.src.type)
 gse7307.src.type[is.na(gse7307.src.type)]<-c("0")
 cc.gse7307.src.type<-unlist(lapply(gse7307.src.type, color.map.gse7307.type))
@@ -298,7 +331,6 @@ gse6008.hv<-heatmap.plus(
 		labRow=NA
 )
 dev.off()
-png(filename = "gse7305.src.png", bg="white", res=300, width=3000, height=3000)
 
 
 ## This block is new ####
@@ -312,48 +344,37 @@ pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 tttt$p.value <- as.numeric(pv)
 tttt$FC <- tttt$mean.T - tttt$mean.N
 func.list$volcano(tttt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium vs Normal (GSE7305)", cut.line = -log10(0.05), foldcut = 0.5) 
-tttt$direction <- NA
-tttt$direction[tttt$FC<0] <- c("DN.KL") # comes from our analylisis ( KL ) 
-tttt$direction[tttt$FC>=0] <- c("UP.KL")  
-tttt$id <- dimnames(tttt)[[1]]
-tttt$label[tttt$p.value<=0.05] <- c("Significant")
-src.sig <- merge(tttt, Src.signature, by.x = 'id', by.y = 'ProbeID', all.x = T) 
 
+build.side.columns = function(df){
+	###This function takes our dataframe, merges with the Src signature and creates RowSideColors for our plots
+	df$direction = NA
+	df$direction[df$FC<0]  <- c("DN.KL") 
+	df$direction[df$FC>=0] <- c("UP.KL")
+	df$id = dimnames(df)[[1]]
+	df$significance[df$p.value<=0.05] <- c("Significant")
+	src.sig <- merge(df, Src.signature, by.x = 'id', by.y = 'ProbeID', all.x = T) 
+	#I want the white color to mark the statistically insignificant cases, so:
+	src.sig$direction.x[which(is.na(src.sig$significance))] <- 'insignificant'
+	bildColors = unlist(lapply(src.sig$direction.y, bildColors.colorize))
+	klColors = unlist(lapply(src.sig$direction.x, klColors.colorize))
+	colors = cbind(bildColors,klColors)
+	return(colors)
+}
 #this table compares our analysis with Bilds's
 tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
 
-# DONT FORGET TO PLOT ONLY THE SAMPLE COLUMNS
-# Plot rowsidecolors for ours, and bild most differentially expressed genes 
-
-#rowsidecolors
-bildColors.colorize <- function(abbrv){ 
-	if (abbrv == 'UP.BILD') 'red'
-	else if (abbrv == 'DN.BILD') 'blue'
-	else '#FFFFFF' 
-} 
-
-klColors.colorize = function(abbrv){
-	if (abbrv == 'UP.KL') 'red'
-	else if (abbrv == 'DN.KL') 'blue'
-	else '#FFFFFF'
-}
-
-bildColors = unlist(lapply(src.sig$direction.y, bildColors.colorize))
-klColors = unlist(lapply(src.sig$direction.x, klColors.colorize))
-colors = cbind(bildColors,klColors)
-
-
+png(filename = "gse7305.src.png", bg="white", res=300, width=3000, height=3000)
 gse7305.hv<-heatmap.plus(
 		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
 		#as.matrix(temp[,(as.character(cl.sort[,1]))]),
 		#as.matrix(gse7305.src[,gse7305.s.sort[,1]]), 
-		as.matrix(tttt[,1:20]),
+		as.matrix(tttt[,1:20]), # PLOTS ONLY THE SAMPLE COLUMNS
 		#temp.cc,
 		na.rm=TRUE,
 		scale="none",
 		#RowSideColor=probe.cc,
 		ColSideColors=cc.col.gse7305,
-		RowSideColors=colors,
+		RowSideColors=build.side.columns(tttt), # ours, and Bild et al.'s most differentially expressed genes
 		col=jet.colors(75),
 		#key=FALSE,
 		symkey=FALSE,
@@ -388,7 +409,7 @@ gse7307.hv<-heatmap.plus(
 		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
 		#as.matrix(temp[,(as.character(cl.sort[,1]))]),
 		#as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])]), 
-		as.matrix(tt),
+		as.matrix(tt[,1:(ncol(tt)-4)]),
 		#temp.cc,
 		na.rm=TRUE,
 		scale="none",
@@ -410,6 +431,8 @@ gse7307.hv<-heatmap.plus(
 		labRow=NA
 )
 dev.off()
+
+
 png(filename = "gse6364.src.png", bg="white", res=300, width=3000, height=3000)
 ttt <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
 ttt <- ttt[-4,] # outlier
@@ -475,4 +498,4 @@ diff.genes.hv<-heatmap.plus(
 		#labCol=NA
 		labRow=NA
 )
-#dev.off()
+dev.off()
