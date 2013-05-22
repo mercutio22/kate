@@ -163,35 +163,35 @@ gse7305.s.sort <- sort.data.frame(gse7305.s[,c("geo_accession","characteristics_
 ## ColSideColors
 color.map.tothill.type <- function(mol.biol) {
 	if (mol.biol=="Fallopian") "green" #green
-	else if (mol.biol=="Ovary") "red" #red
+	else if (mol.biol=="Ovary") "#701C22" #red
 	else if (mol.biol=="Peritoneum") "black"
-	else "#FFFFFF"
+	else "#FFFFFF" #white
 } #
 color.map.gse6008.type <- function(mol.biol) {
 	if (mol.biol=="Clear_Cell") "green" #green
-	else if (mol.biol=="Endometrioid") "pink" #red
+	else if (mol.biol=="Endometrioid") "#701C22" #red
 	else if (mol.biol=="Mucinous") "black"
 	else if (mol.biol=="Serous") "yellow"
 	else "#FFFFFF"
 } #
 color.map.gse7307.type <- function(mol.biol) {
 	if (mol.biol=="myometrium") "green" #green
-	else if (mol.biol=="endometrium/ovary") "pink" #red
-	else if (mol.biol=="endometrium") "red" #red
+	else if (mol.biol=="endometrium/ovary") "#701C22" #red
+	else if (mol.biol=="endometrium") "#9C897E" #grey
 	else "#FFFFFF"
 } #
 color.map.gse7305.type <- function(mol.biol) {
-	if (mol.biol=="Endometrium/Ovary-Disease") "pink" #green
-	else if (mol.biol=="Endometrium-Normal") "red" #red
+	if (mol.biol=="Endometrium/Ovary-Disease") "#701C22" #green
+	else if (mol.biol=="Endometrium-Normal") "#9C897E" #grey
 	else "#FFFFFF"
 } #
 color.map.gse6364.type <- function(mol.biol) {
-	if (mol.biol=="Early Secretory Phase Endometriosis") "pink" #green
-	else if (mol.biol=="Proliferative Phase Endometriosis") "pink" #red
-	else if (mol.biol=="Mid Secretory Phase Endometriosis") "pink" #red
-	else if (mol.biol=="Mid Secretory Phase Normal") "red" #red
-	else if (mol.biol=="Proliferative Phase Normal") "red" #red
-	else if (mol.biol=="Early Secretory Phase Normal") "red" #red
+	if (mol.biol=="Early Secretory Phase Endometriosis") "701C22" #red
+	else if (mol.biol=="Proliferative Phase Endometriosis") "701C22" #red
+	else if (mol.biol=="Mid Secretory Phase Endometriosis") "701C22" #red
+	else if (mol.biol=="Mid Secretory Phase Normal") "#9C897E" 
+	else if (mol.biol=="Proliferative Phase Normal") "#9C897E" 
+	else if (mol.biol=="Early Secretory Phase Normal") "#9C897E" 
 	else "#FFFFFF"
 } #
 
@@ -394,10 +394,8 @@ pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 tttt$p.value <- as.numeric(pv)
 tttt$FC <- tttt$mean.T - tttt$mean.N
 func.list$volcano(tttt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium vs Normal (GSE7305)", cut.line = -log10(0.05), foldcut = 0.5) 
-
 #this table compares our analysis with Bilds's
 tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
-
 png(filename = "gse7305.src.png", bg="white", res=300, width=3000, height=3000)
 gse7305.hv<-heatmap.plus(
 		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
@@ -443,7 +441,7 @@ tt <- tt[-4,] # removed "1556499_s_at"
 tt <- as.data.frame(tt);
 gse7307.norm <- as.character(subset(gse7307.s.sort, characteristics_ch1a=="endometrium")$Sample)
 gse7307.tum <- as.character(subset(gse7307.s.sort, characteristics_ch1a=="endometrium/ovary")$Sample)
-tt = cbind(tt[,gse7307.tum], tt[,gse7307.norm]) ##This might mess up the probe sorting
+tt = cbind(tt[,gse7307.norm],tt[,gse7307.tum]) 
 tt <- log2(tt);
 pv.tt <- apply(tt, 1, func.list$studentT, s1=c(gse7307.norm),s2=c(gse7307.tum))
 tt$p.value <- as.numeric(pv.tt)
