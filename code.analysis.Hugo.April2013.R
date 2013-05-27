@@ -100,6 +100,10 @@ Src.signature$direction[Src.signature$FoldChange<=1] <- c("DN.BILD") # just to d
 Src.signature$direction[Src.signature$FoldChange>1] <- c("UP.BILD")
 src = Src.signature
 
+#a third more complete src signature file from http://david.abcc.ncifcrf.gov/
+david.src = read.table('David.Src.txt', header=T)
+david.src$To=as.character(David.src$To)
+
 ##src signature #Bild et al. 2006
 #src <- read.delim(file="bild.src.txt") #where did this file come from? Maybe GSE3151
 length(intersect(src[,1], dimnames(tothill.d)[[1]]))
@@ -255,11 +259,169 @@ build.top.map = function(df, df.s, df.colormap.function){
 	ColSideColors = matrix(as.character(c(cc.df.src.type)), 
 			nrow = length(cc.df.src.type),
 			ncol = 1)
-	ColSideColors = cbind(ColSideColors, ColSideColors) #a trick to make the top plot part thicker 
+	ColSideColors = cbind(ColSideColors, ColSideColors) #2columns make it thicker 
 	return(ColSideColors)
 }
 
+srcGeneLookup <- function(probes) {
+    return(
+        as.character(unlist(
+            lapply(probes, func.list$vlookup, david.src, 'To')
+            )
+        )
+    )
+}
 
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### make volcano plot plus
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+volcano.plus<-
+function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1, 
+    fold.cut2, pv.adj.col,ncolors=1, text=NA, angle=-45) {
+    #text <-- a logical vector used to subset x    
+    #cut.line <-- p.value cutoff line (not log10 transformed)
+
+    op <- par(no.readonly = TRUE)
+    p<-x[,pv.col]
+
+    if (all(is.na(p))==FALSE) {
+        M<-x[,fold.change.col]
+        upr = p<=cut.line & M >=fold.cut1
+        dwr = p<=cut.line & M<=fold.cut2
+        q <- x[,pv.adj.col]
+        q.f <- x[(upr|dwr),pv.adj.col]
+        minq.f <- 0
+        maxq.f <- 0
+        if (length(q.f) > 0) {
+            minq.f <- min(q.f)
+            maxq.f <- max(q.f)
+            if (is.na(minq.f)) {
+                print(q.f)
+            }
+        }
+        library('marray')
+        Gcol <- maPalette(low = "#C8FFC8", high = "#006400", k = ncolors)
+        Rcol <- maPalette(low = "#FFC8C8", high = "#640000", k = ncolors)
+        xlim.r<-(range(x[,fold.change.col]))
+        if ((length(q.f) > 0) && ( (maxq.f-minq.f) > 0 )) {
+            par(fig=c(0, 0.8, 0, 1), mar=c(4, 4, 4, 1))
+        }
+        if(abs(xlim.r[1])>abs(xlim.r[2])){
+            plot(
+                    x[,fold.change.col], #x-axis
+                    -1*log10(x[,pv.col]), #y-axis
+                    xlim=c(xlim.r[1], abs(xlim.r[1])), #x-axis limits
+                    main=title.plot,
+                    xlab="Gene Expression\nlog2(fold change)",
+                    ylab="-1 * log10 of the Significance",
+                    cex=.5,
+                    pch=20
+            )
+            if ((length(q.f) > 0) && ( (maxq.f-minq.f) > 0 )) {
+                points(
+                    M[upr], -log10(p[upr]), 
+                    col=Rcol[(as.integer(((q[upr]-minq.f)/((maxq.f-minq.f)/(ncolors-1))))+1)],
+                    cex=1,
+                    pch=20)
+                points(M[dwr], -log10(p[dwr]),
+                    col=Gcol[(as.integer(((q[dwr]-minq.f)/((maxq.f-minq.f)/(ncolors-1))))+1)],
+                    cex=1,
+                    pch=20)
+            }   
+            else {
+                points(M[upr], -log10(p[upr]), col=Rcol[ncolors],cex=1,pch=20)
+                points(M[dwr], -log10(p[dwr]), col=Gcol[ncolors],cex=1,pch=20)         
+            }
+
+            #points(M[upr], -log10(p[upr]), col="red")
+            #points(M[dwr], -log10(p[dwr]), col="green")
+
+            abline(h= -log10(cut.line), lty=3, lwd=1)
+            abline(v= fold.cut1, lty=3, lwd=1, col="black")
+            abline(v= fold.cut2, lty=3, lwd=1, col="black")
+        }else{
+            plot(
+                    x[,fold.change.col], #x-axis
+                    -1*log10(x[,pv.col]), #y-axis
+                    xlim=c(-1*xlim.r[2], xlim.r[2]), #x-axis limits
+                    main=title.plot,
+                    xlab="Gene Expression\nlog2(fold change)",
+                    ylab="-1 * log10 of the Significance",
+                    cex=.5,
+                    pch=20
+            )
+
+            if ((length(q.f) > 0) && ( (maxq.f-minq.f) > 0 )) {
+                points(M[upr],
+                    -log10(p[upr]),
+                    col=Rcol[(as.integer(((q[upr]-minq.f)/((maxq.f-minq.f)/(ncolors-1))))+1)],
+                    cex=1,
+                    pch=20)
+                points(M[dwr], 
+                    -log10(p[dwr]), 
+                    col=Gcol[(as.integer(((q[dwr]-minq.f)/((maxq.f-minq.f)/(ncolors-1))))+1)],
+                    cex=1,
+                    pch=20)
+            }
+            else {
+                points(M[upr], -log10(p[upr]), col=Rcol[ncolors],cex=1,pch=20)
+                points(M[dwr], -log10(p[dwr]), col=Gcol[ncolors],cex=1,pch=20)         
+            }
+
+            #points(M[upr], -log10(p[upr]), col="red")
+            #points(M[dwr], -log10(p[dwr]), col="green")
+
+            abline(h= -log10(cut.line), lty=3, lwd=1)
+            abline(v= fold.cut1, lty=3, lwd=1, col="black")
+            abline(v= fold.cut2, lty=3, lwd=1, col="black")
+        }
+        if(!is.na(text[1])){
+            probes = rownames(tttt)[text]
+            text(M[text],
+                -log10(p[text]), 
+                #labels=probes,
+                #My hack for labeling kate's data according to gene symbols
+                labels=srcGeneLookup(probes),
+                cex=0.5,
+                srt=angle,
+                offset=0.25,
+                pos=4)        
+        }
+        if ((length(q.f) > 0) && ( (maxq.f-minq.f) > 0 )) {
+            ColorLevels <- seq( minq.f, maxq.f, ((maxq.f-minq.f)/(ncolors-1)))
+            #print(paste(minq.f,maxq.f))
+            #print(ncolors)
+            #print(ColorLevels)
+            #Stay on same page and set up region and coordinates for legend.
+            par(new=TRUE)
+            par(fig=c(0.8, 0.9, 0.2, 0.8), mar=c(4, 0, 4, 3))
+            #maColorBar(ColorLevels, col=Gcol, horizontal=FALSE, k=0, cex.axis=.8)
+            image(1, seq(1,ncolors,1),
+                matrix(data=seq(1,ncolors,1), ncol=ncolors, nrow=1),
+                col=Gcol,
+                xlab="",ylab="",
+                axes=FALSE
+            )
+            axis(4, at = seq(0.5, (ncolors-0.5), 1), 
+                    labels = rep('',ncolors),cex.axis=.5,mgp=c(0, .2, 0)
+            )
+            par(new=TRUE)
+            par(fig=c(0.9, 1, 0.2, 0.8), mar=c(4, 0, 4, 3))
+            #maColorBar(ColorLevels, col=Rcol, horizontal=FALSE, k=ncolors, cex.axis=.8)
+            image(1, seq(1,ncolors,1),
+                    matrix(data=seq(1,ncolors,1), ncol=ncolors, nrow=1),
+                    col=Rcol,
+                    xlab="",ylab="",
+                    axes=FALSE
+            )
+            axis(4, at = seq(0.5, (ncolors-0.5), 1), 
+                    labels = signif(ColorLevels,2),cex.axis=.5,mgp=c(0, .2, 0),
+            )
+        }
+    }   
+    par(op)
+}
 ####################################################### THIS BLOCK WILL BE GONE #################
 #################################################################################################
 #tothill.type
@@ -401,8 +563,9 @@ build.top.map = function(df, df.s, df.colormap.function){
 
 
 #this table compares our analysis with Bilds's
-tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
+#tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
 
+### Preprocessing
 tttt <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
 tttt <- tttt[-4,]  #"it refers to the 1556499_s_ati probe" an outlier that skews the coloring!
 tttt <- as.data.frame(tttt);
@@ -414,8 +577,23 @@ tttt$mean.T <- tttt.t
 pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 tttt$p.value <- as.numeric(pv)
 tttt$FC <- tttt$mean.T - tttt$mean.N
-func.list$volcano(tttt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium vs Normal (GSE7305)", cut.line = -log10(0.05), foldcut = 0.5) 
-png(filename = "gse7305.src.png", bg="white", res=300, width=3000, height=3000)
+### Volcano Plot
+svg(filename='gse7305.volcano.svg')
+volcano.plus(tttt, 
+    fold.change.col = "FC", 
+    pv.col = "p.value", 
+    title.plot= "Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
+    cut.line = 0.05, 
+    fold.cut1 = 0.5,
+    fold.cut2 = -0.5,
+    pv.adj.col = tttt$p.value,
+    ncolors = 5,
+    text = (tttt$FC < -0.5 | tttt$FC > 0.5) & -log10(tttt$p.value) > -log10(0.05),
+    angle = 45
+    ) 
+dev.off()
+### Heatmap
+svg(filename = "gse7305.src.svg")
 gse7305.hv<-heatmap.plus(
     #as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
     #as.matrix(temp[,(as.character(cl.sort[,1]))]),
@@ -432,15 +610,17 @@ gse7305.hv<-heatmap.plus(
         ),
     RowSideColors=build.side.map(tttt), # most differentially expressed genes
     col=jet.colors(75),
-    #key=FALSE,
+    key=FALSE,
+    #key=T, 
     symkey=FALSE,
+    #symkey=T,
     density.info="none",
     trace="none",
     Rowv=TRUE,
     Colv=NA,
-    cexRow=1,
+    cexRow=0.6,
     cexCol=0.6,
-    keysize=1,
+    keysize=2,
     dendrogram=c("none"),
     main = paste("gse7305; SRC only (73 probes) ",
         dim(tttt[,1:20])[1],
@@ -449,15 +629,18 @@ gse7305.hv<-heatmap.plus(
         "Samples"
         ),
     #labCol=NA
-    labRow=NA
+    labRow=srcGeneLookup(rownames(tttt)),
+    margin = c(10,10)
 )
 dev.off()
-png(filename = "gse7307.src.png", bg="white", res=300, width=3000, height=3000)
+#preprocessing
 tt <- as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])])
 tt <- tt[-4,] # removed "1556499_s_at"
 tt <- as.data.frame(tt);
-gse7307.norm <- as.character(subset(gse7307.s.sort, characteristics_ch1a=="endometrium")$Sample)
-gse7307.tum <- as.character(subset(gse7307.s.sort, characteristics_ch1a=="endometrium/ovary")$Sample)
+gse7307.norm <- as.character(subset(gse7307.s.sort, 
+    characteristics_ch1a=="endometrium")$Sample)
+gse7307.tum <- as.character(subset(gse7307.s.sort, 
+    characteristics_ch1a=="endometrium/ovary")$Sample)
 tt = cbind(tt[,gse7307.norm],tt[,gse7307.tum]) 
 tt <- log2(tt);
 pv.tt <- apply(tt, 1, func.list$studentT, s1=c(gse7307.norm),s2=c(gse7307.tum))
@@ -465,7 +648,23 @@ tt$p.value <- as.numeric(pv.tt)
 tt.n <- apply(tt[,gse7307.norm], 1, mean, na.rm=T); tt$mean.N <- tt.n
 tt.t <- apply(tt[,gse7307.tum], 1, mean, na.rm=T); tt$mean.T <- tt.t
 tt$FC <- tt$mean.T - tt$mean.N
-func.list$volcano(tt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium/Ovary vs Normal (GSE7307)", cut.line = -log10(0.05), foldcut = 0.5)
+#volcano
+svg(filename='gse7307.volcano.svg')
+volcano.plus(tt, 
+    fold.change.col = "FC", 
+    pv.col = "p.value", 
+    title.plot= "Volcano Plot, Endometrium/Ovary vs Endometrium (GSE7307)", 
+    cut.line = 0.05, 
+    fold.cut1 = 0.5,
+    fold.cut2 = -0.5,
+    pv.adj.col = tt$p.value,
+    ncolors = 5,
+    text = (tt$FC < -0.5 | tt$FC > 0.5) & -log10(tt$p.value) > -log10(0.05),
+    angle = 45
+    ) 
+dev.off()
+#heatmap
+png(filename = "gse7307.src.png", bg="white", res=300, width=3000, height=3000)
 gse7307.hv<-heatmap.plus(
 	#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
 	#as.matrix(temp[,(as.character(cl.sort[,1]))]),
@@ -498,7 +697,7 @@ gse7307.hv<-heatmap.plus(
 )
 dev.off()
 
-png(filename = "gse6364.src.png", bg="white", res=300, width=3000, height=3000)
+#preprocessing
 ttt <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
 ttt <- ttt[-4,] # outlier
 ttt <- as.data.frame(ttt);
@@ -515,61 +714,77 @@ ttt$mean.N <- ttt.n.mean
 pv.ttt <- apply(ttt, 1, func.list$studentT, s1=c(as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])),s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])))
 ttt$p.value <- as.numeric(pv.ttt)
 ttt$FC <- ttt$mean.T - ttt$mean.N
-func.list$volcano(ttt, fold.change.col = "FC", pv.col = "p.value", title.plot= "Volcano Plot, Endometrium/Ovary vs Normal (GSE6364)", cut.line = -log10(0.05), foldcut = 0.5)
+#volcano
+svg(filename='gse6364.volcano.svg')
+volcano.plus(ttt,
+    fold.change.col = "FC",
+    pv.col = "p.value",
+    title.plot= "Volcano Plot, Endometriosis vs Normal (GSE6364)",
+    cut.line = 0.05,
+    fold.cut1 = 0.5,
+    fold.cut2 = -0.5,
+    pv.adj.col = ttt$p.value,
+    ncolors = 5,
+    text = (ttt$FC < -0.5 | ttt$FC > 0.5) & -log10(ttt$p.value) > -log10(0.05),
+    angle = 45
+    )
+dev.off()
+#heatmap
+png(filename = "gse6364.src.png", bg="white", res=300, width=3000, height=3000)
 plotthis <- ttt[1:(ncol(ttt)-4)]
 gse6364.hv<-heatmap.plus(
-    as.matrix(plotthis), 
-    #temp.cc,
-    na.rm=TRUE,
-    scale="none",
-    RowSideColor=build.side.map(ttt),
-    ColSideColors=build.top.map(
-        ttt, 
-        gse6364.s, 
-        color.map.gse6364.type),
-    col=jet.colors(75),
-    #key=FALSE,
-    symkey=FALSE,
-    density.info="none",
-    trace="none",
-    Rowv=TRUE,
-    Colv=NA,
-    cexRow=1,
-    cexCol=0.6,
-    keysize=1,
-    dendrogram=c("none"),
-    main = paste("gse6364; SRC only (73 probes) ",
-        dim(plotthis)[1],
-        "Probes; ",
-        dim(plotthis)[2],"Samples"),
-    #labCol=NA
-    labRow=NA
+		as.matrix(plotthis), 
+		#temp.cc,
+		na.rm=TRUE,
+		scale="none",
+		RowSideColor=build.side.map(ttt),
+		ColSideColors=build.top.map(
+			ttt, 
+			gse6364.s, 
+			color.map.gse6364.type),
+		col=jet.colors(75),
+		#key=FALSE,
+		symkey=FALSE,
+		density.info="none",
+		trace="none",
+		Rowv=TRUE,
+		Colv=NA,
+		cexRow=1,
+		cexCol=0.6,
+		keysize=1,
+		dendrogram=c("none"),
+		main = paste("gse6364; SRC only (73 probes) ",
+			dim(plotthis)[1],
+			"Probes; ",
+			dim(plotthis)[2],"Samples"),
+		#labCol=NA
+		labRow=NA
 )
 dev.off()
-png(filename = "differentiated_genes.png", bg="white", res=300, width=3000, height=3000)
-diff.genes.hv<-heatmap.plus(
-    #as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
-    #as.matrix(temp[,(as.character(cl.sort[,1]))]),
-    #as.matrix(gse6364.src[,gse6364.s.sort[,1]]),
-    as.matrix(subset(tt, p.value<=0.05 & FC <= -0.5)[,c(gse7307.norm,gse7307.tum)]), 
-    #temp.cc,
-    na.rm=TRUE,
-    scale="none",
-    #RowSideColor=probe.cc,
-    #ColSideColors=cc.col.gse7307,
-    col=jet.colors(75),
-    #key=FALSE,
-    symkey=FALSE,
-    density.info="none",
-    trace="none",
-    Rowv=TRUE,
-    Colv=NA,
-    cexRow=1,
-    cexCol=0.6,
-    keysize=1,
-    dendrogram=c("none"),
-    main = paste("gse7307; SRC only (73 probes) ",dim(gse6364.src)[1],"Probes; ",dim(gse6364.src)[2],"Samples"),
-    #labCol=NA
-    labRow=NA
-)
-dev.off()
+#png(filename = "differentiated_genes.png", bg="white", res=300, width=3000, height=3000)
+#diff.genes.hv<-heatmap.plus(
+#		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
+#		#as.matrix(temp[,(as.character(cl.sort[,1]))]),
+#		#as.matrix(gse6364.src[,gse6364.s.sort[,1]]),
+#		as.matrix(subset(tt, p.value<=0.05 & FC <= -0.5)[,c(gse7307.norm,gse7307.tum)]), 
+#		#temp.cc,
+#		na.rm=TRUE,
+#		scale="none",
+#		#RowSideColor=probe.cc,
+#		#ColSideColors=cc.col.gse7307,
+#		col=jet.colors(75),
+#		#key=FALSE,
+#		symkey=FALSE,
+#		density.info="none",
+#		trace="none",
+#		Rowv=TRUE,
+#		Colv=NA,
+#		cexRow=1,
+#		cexCol=0.6,
+#		keysize=1,
+#		dendrogram=c("none"),
+#		main = paste("gse7307; SRC only (73 probes) ",dim(gse6364.src)[1],"Probes; ",dim(gse6364.src)[2],"Samples"),
+#		#labCol=NA
+#		labRow=NA
+#)
+#dev.off()
