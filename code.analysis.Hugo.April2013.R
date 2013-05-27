@@ -578,6 +578,23 @@ pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 tttt$p.value <- as.numeric(pv)
 tttt$FC <- tttt$mean.T - tttt$mean.N
 ### Volcano Plot
+plotVolcano <- function(df, filename='volcano.svg', title='Volcano Plot') {
+    svg(filename=filename)
+    volcano.plus(df, 
+        fold.change.col = "FC", 
+        pv.col = "p.value", 
+        title.plot= title, 
+        cut.line = 0.05, 
+        fold.cut1 = 0.5,
+        fold.cut2 = -0.5,
+        pv.adj.col = df$p.value,
+        ncolors = 5,
+        text = (df$FC < -0.5 | df$FC > 0.5) & -log10(df$p.value) > -log10(0.05),
+        angle = 45
+        ) 
+    dev.off()
+} 
+
 svg(filename='gse7305.volcano.svg')
 volcano.plus(tttt, 
     fold.change.col = "FC", 
