@@ -102,7 +102,7 @@ src = Src.signature
 
 #a third more complete src signature file from http://david.abcc.ncifcrf.gov/
 david.src = read.table('David.Src.txt', header=T)
-david.src$To=as.character(David.src$To)
+david.src$To=as.character(david.src$To)
 
 ##src signature #Bild et al. 2006
 #src <- read.delim(file="bild.src.txt") #where did this file come from? Maybe GSE3151
@@ -422,77 +422,64 @@ function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1,
     }   
     par(op)
 }
-####################################################### THIS BLOCK WILL BE GONE #################
-#################################################################################################
-#tothill.type
-#tothill.src.type<-apply(as.matrix(names(tothill.src[,tothill.s.sort[,1]])),
-#	1,
-#	func.list$vlookup,
-#	tothill.s[,c("geo_accession","characteristics_ch1a")],
-#	"characteristics_ch1a")
-#tothill.src.type<-as.character(tothill.src.type)
-#tothill.src.type[is.na(tothill.src.type)]<-c("0")
-#cc.tothill.src.type<-unlist(lapply(tothill.src.type, color.map.tothill.type))
-#cc.col.t<-matrix(as.character(c(cc.tothill.src.type)), nrow=285,ncol=1)
-#colnames(cc.col.t) = c("Tothill")
-#cc.col.t <- cbind(cc.col.t, cc.col.t)
-#
-##gse6008.type
-#gse6008.src.type<-apply(as.matrix(names(gse6008.src[,gse6008.s.sort[,1]])),1,func.list$vlookup,gse6008.s[,c("geo_accession","characteristics_ch1a")],"characteristics_ch1a")
-#gse6008.src.type<-as.character(gse6008.src.type)
-#gse6008.src.type[is.na(gse6008.src.type)]<-c("0")
-#cc.gse6008.src.type<-unlist(lapply(gse6008.src.type, color.map.gse6008.type))
-#
-#cc.col.gse6008<-matrix(as.character(c(cc.gse6008.src.type)), nrow=103,ncol=1)
-#colnames(cc.col.gse6008) = c("GSE6008")
-#cc.col.gse6008 <- cbind(cc.col.gse6008, cc.col.gse6008)
-#
-##gse6364.type ##PROBLEM: the resulting dataframe is 37 by 2 - heatmap expects 41 by 2
-#gse6364.src.type<-apply(as.matrix(names(gse6364.src[,gse6364.s.sort[,1]])),1,func.list$vlookup,gse6364.s[,c("geo_accession","characteristics_ch1a")],"characteristics_ch1a")
-#gse6364.src.type<-as.character(gse6364.src.type)
-#gse6364.src.type[is.na(gse6364.src.type)]<-c("0")
-#cc.gse6364.src.type<-unlist(lapply(gse6364.src.type, color.map.gse6364.type))
-#
-#cc.col.gse6364<-matrix(as.character(c(cc.gse6364.src.type)), 
-#	nrow=37,
-#	#nrow=41,
-#	ncol=1)
-#colnames(cc.col.gse6364) = c("GSE6364")
-#cc.col.gse6364 <- cbind(cc.col.gse6364, cc.col.gse6364)
-#
-##gse7305.type
-#gse7305.src.type<-apply(
-#	as.matrix(names(gse7305.src[,gse7305.s.sort[,1]])),
-#	1,
-#	func.list$vlookup,
-#	gse7305.s[,c("geo_accession","characteristics_ch1a")],
-#	"characteristics_ch1a"
-#	)
-#gse7305.src.type<-as.character(gse7305.src.type)
-#gse7305.src.type[is.na(gse7305.src.type)]<-c("0")
-#cc.gse7305.src.type<-unlist(lapply(gse7305.src.type, color.map.gse7305.type))
-#
-#cc.col.gse7305<-matrix(as.character(c(cc.gse7305.src.type)), nrow=20,ncol=1)
-#colnames(cc.col.gse7305) = c("GSE7305")
-#cc.col.gse7305 <- cbind(cc.col.gse7305, cc.col.gse7305)
-#
-##gse7307.type
-#gse7307.src.type<-apply(
-#	as.matrix(names(gse7307.src[,as.character(gse7307.s.sort[,1])])),
-#	1,
-#	func.list$vlookup,
-#	gse7307.s[,c("Sample","characteristics_ch1a")],
-#	"characteristics_ch1a"
-#	)
-#gse7307.src.type<-as.character(gse7307.src.type)
-#gse7307.src.type[is.na(gse7307.src.type)]<-c("0")
-#cc.gse7307.src.type<-unlist(lapply(gse7307.src.type, color.map.gse7307.type))
-#
-#cc.col.gse7307<-matrix(as.character(c(cc.gse7307.src.type)), nrow=134,ncol=1)
-#colnames(cc.col.gse7307) = c("GSE7307")
-#cc.col.gse7307 <- cbind(cc.col.gse7307, cc.col.gse7307)
-#######################################################################################
-################################GONE###################################################
+plotVolcano <- function(df, filename='volcano.svg', title='Volcano Plot') {
+    #custom volcano plot customized for kate's analysis
+    svg(filename=filename)
+    volcano.plus(df, 
+        fold.change.col = "FC", 
+        pv.col = "p.value", 
+        title.plot= title, 
+        cut.line = 0.05, 
+        fold.cut1 = 0.5,
+        fold.cut2 = -0.5,
+        pv.adj.col = df$p.value,
+        ncolors = 5,
+        text = (df$FC < -0.5 | df$FC > 0.5) & -log10(df$p.value) > -log10(0.05),
+        angle = 45
+        ) 
+    dev.off()
+} 
+plotHeatmap <-
+function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
+    svg(filename=filename)
+    #colnames I always want removed:
+    filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
+    # R syntax can become ugly. This is how I acchieve removal by colname
+    filterout <-
+    -1 * unlist(lapply(filterout, function(x){which(colnames(tttt) == x)} ) )
+    filtered = df[,filterout]
+    hv <- heatmap.plus(
+        as.matrix(filtered), # PLOTS ONLY THE SAMPLE COLUMNS
+        na.rm=TRUE,
+        scale="none",
+        ColSideColors=build.top.map(df, df.s, colormap),
+        RowSideColors=build.side.map(df), # most differentially expressed genes
+        col=jet.colors(75),
+        key=FALSE,
+        #key=T, 
+        symkey=FALSE,
+        #symkey=T,
+        density.info="none",
+        trace="none",
+        Rowv=TRUE,
+        Colv=NA,
+        cexRow=0.6,
+        cexCol=0.6,
+        keysize=2,
+        dendrogram=c("none"),
+        main = paste(title,
+            dim(filtered)[1],
+            "Probes; ",
+            dim(filtered)[2],
+            "Samples"
+            ),
+        #labCol=NA
+        labRow=srcGeneLookup(rownames(df)),
+        margin = c(10,10)
+    )
+    dev.off()
+    return(hv)
+}
 
 
 #cc.col.merged <- rbind(cc.col.t, cc.col.gse6008)
@@ -577,40 +564,14 @@ tttt$mean.T <- tttt.t
 pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 tttt$p.value <- as.numeric(pv)
 tttt$FC <- tttt$mean.T - tttt$mean.N
-### Volcano Plot
-plotVolcano <- function(df, filename='volcano.svg', title='Volcano Plot') {
-    svg(filename=filename)
-    volcano.plus(df, 
-        fold.change.col = "FC", 
-        pv.col = "p.value", 
-        title.plot= title, 
-        cut.line = 0.05, 
-        fold.cut1 = 0.5,
-        fold.cut2 = -0.5,
-        pv.adj.col = df$p.value,
-        ncolors = 5,
-        text = (df$FC < -0.5 | df$FC > 0.5) & -log10(df$p.value) > -log10(0.05),
-        angle = 45
-        ) 
-    dev.off()
-} 
 
-svg(filename='gse7305.volcano.svg')
-volcano.plus(tttt, 
-    fold.change.col = "FC", 
-    pv.col = "p.value", 
-    title.plot= "Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
-    cut.line = 0.05, 
-    fold.cut1 = 0.5,
-    fold.cut2 = -0.5,
-    pv.adj.col = tttt$p.value,
-    ncolors = 5,
-    text = (tttt$FC < -0.5 | tttt$FC > 0.5) & -log10(tttt$p.value) > -log10(0.05),
-    angle = 45
-    ) 
-dev.off()
-### Heatmap
-svg(filename = "gse7305.src.svg")
+### Volcano Plot
+plotVolcano(tttt,
+    title="Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
+    filename='gse7305.volcano.svg'
+)
+
+
 gse7305.hv<-heatmap.plus(
     #as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
     #as.matrix(temp[,(as.character(cl.sort[,1]))]),
