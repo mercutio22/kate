@@ -552,7 +552,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
 #this table compares our analysis with Bilds's
 #tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
 
-### Preprocessing
+### Preprocessing GSE7305
 tttt <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
 tttt <- tttt[-4,]  #"it refers to the 1556499_s_ati probe" an outlier that skews the coloring!
 tttt <- as.data.frame(tttt);
@@ -565,53 +565,17 @@ pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 tttt$p.value <- as.numeric(pv)
 tttt$FC <- tttt$mean.T - tttt$mean.N
 
-### Volcano Plot
+### Plotting
 plotVolcano(tttt,
     title="Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
     filename='gse7305.volcano.svg'
-)
+    )
+gse7305.hv <- plotHeatmap(tttt, gse7305.s, color.map.gse7305.type,
+    title = 'GSE7305',
+    filename = 'gse7305.heatmap.svg'
+    )
 
-
-gse7305.hv<-heatmap.plus(
-    #as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
-    #as.matrix(temp[,(as.character(cl.sort[,1]))]),
-    #as.matrix(gse7305.src[,gse7305.s.sort[,1]]), 
-    as.matrix(tttt[,1:20]), # PLOTS ONLY THE SAMPLE COLUMNS
-    #temp.cc,
-    na.rm=TRUE,
-    scale="none",
-    #RowSideColor=probe.cc,
-    #ColSideColors=cc.col.gse7305,
-    ColSideColors=build.top.map(tttt,
-        gse7305.s,
-        color.map.gse7305.type
-        ),
-    RowSideColors=build.side.map(tttt), # most differentially expressed genes
-    col=jet.colors(75),
-    key=FALSE,
-    #key=T, 
-    symkey=FALSE,
-    #symkey=T,
-    density.info="none",
-    trace="none",
-    Rowv=TRUE,
-    Colv=NA,
-    cexRow=0.6,
-    cexCol=0.6,
-    keysize=2,
-    dendrogram=c("none"),
-    main = paste("gse7305; SRC only (73 probes) ",
-        dim(tttt[,1:20])[1],
-        "Probes; ",
-        dim(tttt[,1:20])[2],
-        "Samples"
-        ),
-    #labCol=NA
-    labRow=srcGeneLookup(rownames(tttt)),
-    margin = c(10,10)
-)
-dev.off()
-#preprocessing
+### Preprocessing GSE7307
 tt <- as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])])
 tt <- tt[-4,] # removed "1556499_s_at"
 tt <- as.data.frame(tt);
@@ -626,56 +590,17 @@ tt$p.value <- as.numeric(pv.tt)
 tt.n <- apply(tt[,gse7307.norm], 1, mean, na.rm=T); tt$mean.N <- tt.n
 tt.t <- apply(tt[,gse7307.tum], 1, mean, na.rm=T); tt$mean.T <- tt.t
 tt$FC <- tt$mean.T - tt$mean.N
-#volcano
-svg(filename='gse7307.volcano.svg')
-volcano.plus(tt, 
-    fold.change.col = "FC", 
-    pv.col = "p.value", 
-    title.plot= "Volcano Plot, Endometrium/Ovary vs Endometrium (GSE7307)", 
-    cut.line = 0.05, 
-    fold.cut1 = 0.5,
-    fold.cut2 = -0.5,
-    pv.adj.col = tt$p.value,
-    ncolors = 5,
-    text = (tt$FC < -0.5 | tt$FC > 0.5) & -log10(tt$p.value) > -log10(0.05),
-    angle = 45
-    ) 
-dev.off()
-#heatmap
-png(filename = "gse7307.src.png", bg="white", res=300, width=3000, height=3000)
-gse7307.hv<-heatmap.plus(
-	#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
-	#as.matrix(temp[,(as.character(cl.sort[,1]))]),
-	#as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])]), 
-	as.matrix(tt[,1:(ncol(tt)-4)]),
-	#temp.cc,
-	na.rm=TRUE,
-	scale="none",
-	#RowSideColor=probe.cc,
-	ColSideColors=build.top.map(tt, gse7307.s, color.map.gse7307.type),
-	RowSideColors=build.side.map(tt),
-	col=jet.colors(75),
-	#key=FALSE,
-	symkey=FALSE,
-	density.info="none",
-	trace="none",
-	Rowv=TRUE,
-	Colv=NA,
-	cexRow=1,
-	cexCol=0.6,
-	keysize=1,
-	dendrogram=c("none"),
-	main = paste("gse7307; SRC only (73 probes) ",
-		dim(tt[,1:(ncol(tt)-4)])[1],
-		"Probes; ",
-		 dim(tt[,1:(ncol(tt)-4)])[2],
-		"Samples"),
-	#labCol=NA
-	labRow=NA
-)
-dev.off()
+### Plotting
+plotVolcano(tt,
+    title = "Volcano Plot, Endometrium/Ovary vs Endometrium (GSE7307)",
+    filename = 'gse7307.volcano.svg'
+    )
+gse7307.hv <- plotHeatmap(tt, gse7307.s, color.map.gse7307.type,
+    title = 'GSE7307',
+    filename = 'gse.7307.volcano.svg'
+    )
 
-#preprocessing
+### Preprocessing GSE6364
 ttt <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
 ttt <- ttt[-4,] # outlier
 ttt <- as.data.frame(ttt);
@@ -692,77 +617,13 @@ ttt$mean.N <- ttt.n.mean
 pv.ttt <- apply(ttt, 1, func.list$studentT, s1=c(as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])),s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])))
 ttt$p.value <- as.numeric(pv.ttt)
 ttt$FC <- ttt$mean.T - ttt$mean.N
-#volcano
-svg(filename='gse6364.volcano.svg')
-volcano.plus(ttt,
-    fold.change.col = "FC",
-    pv.col = "p.value",
-    title.plot= "Volcano Plot, Endometriosis vs Normal (GSE6364)",
-    cut.line = 0.05,
-    fold.cut1 = 0.5,
-    fold.cut2 = -0.5,
-    pv.adj.col = ttt$p.value,
-    ncolors = 5,
-    text = (ttt$FC < -0.5 | ttt$FC > 0.5) & -log10(ttt$p.value) > -log10(0.05),
-    angle = 45
+### Plotting
+plotVolcano(ttt,
+    title = "Volcano Plot, Endometriosis vs Normal (GSE6364)",
+    filename = 'gse6364.volcano.svg'
     )
-dev.off()
-#heatmap
-png(filename = "gse6364.src.png", bg="white", res=300, width=3000, height=3000)
-plotthis <- ttt[1:(ncol(ttt)-4)]
-gse6364.hv<-heatmap.plus(
-		as.matrix(plotthis), 
-		#temp.cc,
-		na.rm=TRUE,
-		scale="none",
-		RowSideColor=build.side.map(ttt),
-		ColSideColors=build.top.map(
-			ttt, 
-			gse6364.s, 
-			color.map.gse6364.type),
-		col=jet.colors(75),
-		#key=FALSE,
-		symkey=FALSE,
-		density.info="none",
-		trace="none",
-		Rowv=TRUE,
-		Colv=NA,
-		cexRow=1,
-		cexCol=0.6,
-		keysize=1,
-		dendrogram=c("none"),
-		main = paste("gse6364; SRC only (73 probes) ",
-			dim(plotthis)[1],
-			"Probes; ",
-			dim(plotthis)[2],"Samples"),
-		#labCol=NA
-		labRow=NA
-)
-dev.off()
-#png(filename = "differentiated_genes.png", bg="white", res=300, width=3000, height=3000)
-#diff.genes.hv<-heatmap.plus(
-#		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
-#		#as.matrix(temp[,(as.character(cl.sort[,1]))]),
-#		#as.matrix(gse6364.src[,gse6364.s.sort[,1]]),
-#		as.matrix(subset(tt, p.value<=0.05 & FC <= -0.5)[,c(gse7307.norm,gse7307.tum)]), 
-#		#temp.cc,
-#		na.rm=TRUE,
-#		scale="none",
-#		#RowSideColor=probe.cc,
-#		#ColSideColors=cc.col.gse7307,
-#		col=jet.colors(75),
-#		#key=FALSE,
-#		symkey=FALSE,
-#		density.info="none",
-#		trace="none",
-#		Rowv=TRUE,
-#		Colv=NA,
-#		cexRow=1,
-#		cexCol=0.6,
-#		keysize=1,
-#		dendrogram=c("none"),
-#		main = paste("gse7307; SRC only (73 probes) ",dim(gse6364.src)[1],"Probes; ",dim(gse6364.src)[2],"Samples"),
-#		#labCol=NA
-#		labRow=NA
-#)
-#dev.off()
+gse6364.hv <- plotHeatmap(tt, gse6364.s, color.map.gse6364.type,
+    title = 'GSE6364',
+    filename = 'gse.6364.volcano.svg'
+    )
+
