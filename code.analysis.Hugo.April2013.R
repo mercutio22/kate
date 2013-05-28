@@ -4,6 +4,8 @@ library(heatmap.plus)
 source(file="Func_List.r")
 library(matlab)
 library(stringr)
+library(plyr)
+options(stringsAsFactors=FALSE)
 
 ###tothill data
 #tothill <- getGEO("GSE9891")
@@ -95,9 +97,13 @@ load(file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
 ## New Src signature data frame
 Src.signature = read.table('src_signature.txt', sep='\t') #from suplemental table1
 colnames(Src.signature) = c('ProbeID', 'GeneSymbol', 'Description', 'LocusLink', 'FoldChange')
+### adjust this criteria
+Src.signature$logFC <- log2(Src.signature$FoldChange)
 Src.signature$direction <- NA
-Src.signature$direction[Src.signature$FoldChange<=1] <- c("DN.BILD") # just to denote this info is not from our analysis (BILD) 
-Src.signature$direction[Src.signature$FoldChange>1] <- c("UP.BILD")
+#Src.signature$direction[Src.signature$FoldChange<1] <- c("DN.BILD") # just to denote this info is not from our analysis (BILD) 
+#Src.signature$direction[Src.signature$FoldChange>1] <- c("UP.BILD")
+Src.signature$direction[Src.signature$logFC<0] <- c("DN.BILD") # just to denote this info is not from our analysis (BILD) 
+Src.signature$direction[Src.signature$logFC>0] <- c("UP.BILD")
 src = Src.signature
 
 #a third more complete src signature file from http://david.abcc.ncifcrf.gov/
@@ -221,16 +227,19 @@ klColors.colorize = function(abbrv){
 build.side.map = function(df){
 	### takes dataframe, merges with the Src signature and creates RowSideColors for our plots
 	## df is the full dataframe, with FC and P values
-	df$direction = NA
-	df$direction[df$FC<0]  <- c("DN.KL") 
-	df$direction[df$FC>=0] <- c("UP.KL")
-	df$id = dimnames(df)[[1]]
-	df$significance[df$p.value<=0.05] <- c("Significant")
-	src.sig <- merge(df, Src.signature, by.x = 'id', by.y = 'ProbeID', all.x = T) 
+	df$ProbeID = dimnames(df)[[1]]
+    Src.signature$ProbeID <- as.character(Src.signature$ProbeID)
+    # The following line was messing up the row (probes) ordering
+	#src.sig <- merge(df, Src.signature, by.x = 'id', by.y = 'ProbeID', all.x = T, sort=F) 
+    src.sig <- join(df, Src.signature, by=c("ProbeID")) # match='first') 
+	src.sig$Ldirection = NA # our expression directionality vector
+	src.sig$Ldirection[src.sig$FC<0]  <- c("DN.KL") 
+	src.sig$Ldirection[src.sig$FC>0] <- c("UP.KL")
+	src.sig$Lsignificance[src.sig$p.value<=0.05] <- c("Significant")
 	#I want the white color to mark the statistically insignificant cases, so:
-	src.sig$direction.x[which(is.na(src.sig$significance))] <- 'insignificant'
-	bildColors = unlist(lapply(src.sig$direction.y, bildColors.colorize))
-	klColors = unlist(lapply(src.sig$direction.x, klColors.colorize))
+	src.sig$Ldirection[which(is.na(src.sig$Lsignificance))] <- 'insignificant'
+	bildColors = unlist(lapply(src.sig$direction, bildColors.colorize))
+	klColors = unlist(lapply(src.sig$Ldirection, klColors.colorize))
 	colors = cbind(bildColors,klColors)
 	colnames(colors) = c('Bild et al.', 'Lawrenson et al.')
 	return(colors)
@@ -430,11 +439,12 @@ plotVolcano <- function(df, filename='volcano.svg', title='Volcano Plot') {
         pv.col = "p.value", 
         title.plot= title, 
         cut.line = 0.05, 
-        fold.cut1 = 0.5,
-        fold.cut2 = -0.5,
+        fold.cut1 = 0,
+        fold.cut2 = 0,
         pv.adj.col = df$p.value,
         ncolors = 5,
-        text = (df$FC < -0.5 | df$FC > 0.5) & -log10(df$p.value) > -log10(0.05),
+        #text = (df$FC < -0.5 | df$FC > 0.5) & -log10(df$p.value) > -log10(0.05),
+        text = -log10(df$p.value) > -log10(0.05),
         angle = 45
         ) 
     dev.off()
@@ -446,12 +456,13 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
     filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
     # R syntax can become ugly. This is how I acchieve removal by colname
     filterout <-
-    -1 * unlist(lapply(filterout, function(x){which(colnames(tttt) == x)} ) )
+    -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
     filtered = df[,filterout]
     hv <- heatmap.plus(
         as.matrix(filtered), # PLOTS ONLY THE SAMPLE COLUMNS
         na.rm=TRUE,
         scale="none",
+        #scale="row",
         ColSideColors=build.top.map(df, df.s, colormap),
         RowSideColors=build.side.map(df), # most differentially expressed genes
         col=jet.colors(75),
@@ -480,7 +491,69 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
     dev.off()
     return(hv)
 }
-
+plotBildDirectionality <-
+function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
+    #Produces a heatmap sorted according to Bild Directionality
+    bildExpDir <- build.side.map(df)[,1] # Bild et al. expression directionality
+    up <- which(bildExpDir == 'red')
+    down <- which(bildExpDir == 'green')
+    reorderRows <- c( up, down ) 
+    df <- df[reorderRows,]
+#   newmap <- build.side.map(df)
+#   bildExpDir <- newmap[,1] # Bild et al. expression directionality
+#   up <- which(bildExpDir == 'red')
+#   down <- which(bildExpDir == 'green')
+#   #reorder within bild upregulated and downregulated:
+#    g1 <- newmap[up,2] 
+#    g2 <- newmap[down,2]
+#    reorderRows <- c( 
+#        which(g1 == 'red'),
+#        which(g1 == 'green'),
+#        which(g1 == '#FFFFFF'),
+#        which(g2 == 'red') + length(g1),
+#        which(g2 == 'green') + length(g1),
+#        which(g2 == '#FFFFFF') + length(g1) 
+#    )
+#   df <- df[reorderRows,]    
+    svg(filename=filename)
+    #colnames I always want removed:
+    filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
+    # R syntax can become ugly. This is how I acchieve removal by colname
+    filterout <-
+    -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
+    filtered = df[,filterout]
+    hv <- heatmap.plus(
+        as.matrix(filtered), # PLOTS ONLY THE SAMPLE COLUMNS
+        na.rm=TRUE,
+        scale="none",
+        ColSideColors=build.top.map(df, df.s, colormap),
+        RowSideColors=build.side.map(df), # most differentially expressed genes
+        col=jet.colors(75),
+        key=FALSE,
+        #key=T, 
+        symkey=FALSE,
+        #symkey=T,
+        density.info="none",
+        trace="none",
+        Rowv=NA,
+        Colv=NA,
+        cexRow=0.6,
+        cexCol=0.6,
+        keysize=2,
+        dendrogram=c("none"),
+        main = paste(title,
+            dim(filtered)[1],
+            "Probes; ",
+            dim(filtered)[2],
+            "Samples"
+            ),
+        #labCol=NA
+        labRow=srcGeneLookup(rownames(df)),
+        margin = c(10,10)
+    )
+    dev.off()
+    return(hv)
+}
 
 #cc.col.merged <- rbind(cc.col.t, cc.col.gse6008)
 #colnames(cc.col.merged) = c("Tothill & GSE6008","Tothill & GSE6008")
@@ -554,7 +627,8 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
 
 ### Preprocessing GSE7305
 tttt <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
-tttt <- tttt[-4,]  #"it refers to the 1556499_s_ati probe" an outlier that skews the coloring!
+#tttt <- tttt[-4,]  #"1556499_s_ati probe" an outlier that skews the coloring!
+tttt <- tttt[-which(rownames(tttt) == "1556499_s_at"),] 
 tttt <- as.data.frame(tttt);
 tttt <- log2(tttt);
 tttt.n <- apply(tttt[,1:10], 1, mean, na.rm=T); 
@@ -565,6 +639,7 @@ pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 tttt$p.value <- as.numeric(pv)
 tttt$FC <- tttt$mean.T - tttt$mean.N
 
+
 ### Plotting
 plotVolcano(tttt,
     title="Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
@@ -574,10 +649,14 @@ gse7305.hv <- plotHeatmap(tttt, gse7305.s, color.map.gse7305.type,
     title = 'GSE7305',
     filename = 'gse7305.heatmap.svg'
     )
+gse7305.hvb <- plotBildDirectionality(tttt, gse7305.s, color.map.gse7305.type,
+    title = 'GSE7305 Bild Sorted',
+    filename = 'gse7305.bild.sorted.svg'
+    )
 
 ### Preprocessing GSE7307
 tt <- as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])])
-tt <- tt[-4,] # removed "1556499_s_at"
+tt <- tt[-which(rownames(tt) == "1556499_s_at"),] 
 tt <- as.data.frame(tt);
 gse7307.norm <- as.character(subset(gse7307.s.sort, 
     characteristics_ch1a=="endometrium")$Sample)
@@ -597,12 +676,16 @@ plotVolcano(tt,
     )
 gse7307.hv <- plotHeatmap(tt, gse7307.s, color.map.gse7307.type,
     title = 'GSE7307',
-    filename = 'gse.7307.volcano.svg'
+    filename = 'gse7307.heatmap.svg'
+    )
+gse7307.hvb <- plotBildDirectionality(tt, gse7307.s, color.map.gse7307.type,
+    title = 'GSE7307 Bild Sorted',
+    filename = 'gse7307.bild.sorted.svg'
     )
 
 ### Preprocessing GSE6364
 ttt <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
-ttt <- ttt[-4,] # outlier
+ttt <- ttt[-which(rownames(ttt) == "1556499_s_at"),] # outlier
 ttt <- as.data.frame(ttt);
 ttt <- log2(ttt);
 #normals
@@ -622,8 +705,12 @@ plotVolcano(ttt,
     title = "Volcano Plot, Endometriosis vs Normal (GSE6364)",
     filename = 'gse6364.volcano.svg'
     )
-gse6364.hv <- plotHeatmap(tt, gse6364.s, color.map.gse6364.type,
+gse6364.hv <- plotHeatmap(ttt, gse6364.s, color.map.gse6364.type,
     title = 'GSE6364',
-    filename = 'gse.6364.volcano.svg'
+    filename = 'gse6364.heatmap.svg'
+    )
+gse6364.hvb <- plotBildDirectionality(ttt, gse6364.s, color.map.gse6364.type,
+    title = 'GSE6364 Bild Sorted',
+    filename = 'gse6364.bild.sorted.svg'
     )
 
