@@ -41,14 +41,23 @@ options(stringsAsFactors=FALSE)
 #
 
 ##TODO - get more datasets
-##GSE5108
 ##GSE37837
-#GSE23339
+##GSE23339
 
-##GSE5108 #already normalized
-gse5108 = getGEO('GSE5108')
-gse5108.d = as.data.frame(exprs(gse5108[[1]]))
-gse5108.s = phenoData(gse5108$GSE5108_series_matrix.txt.gz)@data #Holy Cow, 11 sample kinds.
+
+##GSE5108 
+# already normalized (Why kate says otherwise on spreadsheet?)
+# 22 different groups! (22 samples - Eutopic Endometrium vs Ectopic Endometriosis)
+# I will consider all strings containing:
+# - 'eutopic' as normal controls.
+# - 'endometriosis' as cancer.  
+# Thus: 11 normals, 11 cancer.
+# We may stratify different cancer grades latter.
+
+#gse5108 = getGEO('GSE5108')
+#gse5108.d = as.data.frame(exprs(gse5108[[1]]))
+#gse5108.s = phenoData(gse5108$GSE5108_series_matrix.txt.gz)@data #Holy Cow, 11 sample kinds.
+# all(dimnames(gse5108.s)[[1]] == names(gse5108.d))
 
 #dataframe <- NULL
 #for(i in 1:length(gse7307.s$Sample)){
@@ -86,13 +95,29 @@ gse5108.s = phenoData(gse5108$GSE5108_series_matrix.txt.gz)@data #Holy Cow, 11 s
 #all(dimnames(gse6364.s)[[1]]==names(gse6364.d))
 #
 #
-#save(gse6364.d, gse6364.s, gse7307.d, gse7307.s, gse7305.d, gse7305.s, tothill.d, tothill.s, gse6008.d, gse6008.s, file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
+#
+
+
+save(
+    gse6364.d, 
+    gse6364.s, 
+    gse7307.d, 
+    gse7307.s, 
+    gse7305.d, 
+    gse7305.s, 
+    tothill.d, 
+    tothill.s, 
+    gse6008.d, 
+    gse6008.s,
+    gse5108.s,
+    gse5108.d, 
+    file="GEOfiles_associated_withENDO.downloaded.April2013.rda"
+    )
 
 
 ###start from here#####
 setwd("/data/htorres/kate")
 load(file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
-
 
 ## New Src signature data frame
 Src.signature = read.table('src_signature.txt', sep='\t') #from suplemental table1
@@ -499,6 +524,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
     down <- which(bildExpDir == 'green')
     reorderRows <- c( up, down ) 
     df <- df[reorderRows,]
+#### uncomment this part to subsort accordingX
 #   newmap <- build.side.map(df)
 #   bildExpDir <- newmap[,1] # Bild et al. expression directionality
 #   up <- which(bildExpDir == 'red')
@@ -662,7 +688,7 @@ gse7307.norm <- as.character(subset(gse7307.s.sort,
     characteristics_ch1a=="endometrium")$Sample)
 gse7307.tum <- as.character(subset(gse7307.s.sort, 
     characteristics_ch1a=="endometrium/ovary")$Sample)
-tt = cbind(tt[,gse7307.norm],tt[,gse7307.tum]) 
+tt <- cbind(tt[,gse7307.norm],tt[,gse7307.tum]) 
 tt <- log2(tt);
 pv.tt <- apply(tt, 1, func.list$studentT, s1=c(gse7307.norm),s2=c(gse7307.tum))
 tt$p.value <- as.numeric(pv.tt)
