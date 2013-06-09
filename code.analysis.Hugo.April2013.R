@@ -5,6 +5,8 @@ source(file="Func_List.r")
 library(matlab)
 library(stringr)
 library(plyr)
+library("hgu133plus2.db") # Affymetrix Human Genome U133 Plus 2.0 Array annotation data
+library("hwgcod.db") # GE/Amersham Codelink Human Whole Genome Bioarray 
 options(stringsAsFactors=FALSE)
 
 ###tothill data
@@ -27,7 +29,8 @@ options(stringsAsFactors=FALSE)
 #gse6008.s <- phenoData(gse6008$GSE6008_series_matrix.txt.gz)@data
 #all(dimnames(gse6008.s)[[1]]==names(gse6008.d))
 #
-###GSE7305 - 20 samples 10 endo/ovary and 10 endo normal
+###GSE7305 - 20 samples 10 endo/ovary and 10 endo normaiil 
+# platform Affymetrix U133 plus 2.0 array
 #gse7305 <- getGEO("GSE7305")
 #gse7305.d <- (exprs(gse7305$GSE7305_series_matrix.txt.gz))
 #gse7305.s <- phenoData(gse7305$GSE7305_series_matrix.txt.gz)@data
@@ -47,13 +50,12 @@ options(stringsAsFactors=FALSE)
 
 ##GSE5108 
 # already normalized (Why kate says otherwise on spreadsheet?)
-# 22 different groups! (22 samples - Eutopic Endometrium vs Ectopic Endometriosis)
+# 22 samples - 11 Eutopic Endometrium vs 11 Ectopic Endometriosis
 # I will consider all strings containing:
 # - 'eutopic' as normal controls.
 # - 'endometriosis' as cancer.  
 # Thus: 11 normals, 11 cancer.
 # We may stratify different cancer grades latter.
-
 #gse5108 = getGEO('GSE5108')
 #gse5108.d = as.data.frame(exprs(gse5108[[1]]))
 #gse5108.s = phenoData(gse5108$GSE5108_series_matrix.txt.gz)@data #Holy Cow, 11 sample kinds.
@@ -87,40 +89,43 @@ options(stringsAsFactors=FALSE)
 #dimnames(gse7307.d)[[1]] <- gse7307.d[,1]
 #gse7307.d <- gse7307.d[,-1]
 #all(names(gse7307.d)==gse7307.s$Sample)
-#
+
 ###GSE6364 - list of a variety of tumor/normal samples (need to select only relevant cases
 #gse6364 <- getGEO("GSE6364")
 #gse6364.d <- (exprs(gse6364$GSE6364_series_matrix.txt.gz))
 #gse6364.s <- phenoData(gse6364$GSE6364_series_matrix.txt.gz)@data
-#all(dimnames(gse6364.s)[[1]]==names(gse6364.d))
-#
-#
-#
+
+###GSE23339 18 endmetrioma(ovarian EMS) vs 20 eutopic endometrium
+#platform: illumina human6-v2.0 (GPL6102) - seems normalized.
+#gse23339 <- getGEO("GSE23339")
+#gse23339.d <- (exprs(gse23339$GSE23339_series_matrix.txt.gz))
+#gse23339.s <- phenoData(gse23339$GSE23339_series_matrix.txt.gz)@data
 
 
-save(
-    gse6364.d, 
-    gse6364.s, 
-    gse7307.d, 
-    gse7307.s, 
-    gse7305.d, 
-    gse7305.s, 
-    tothill.d, 
-    tothill.s, 
-    gse6008.d, 
-    gse6008.s,
-    gse5108.s,
-    gse5108.d, 
-    file="GEOfiles_associated_withENDO.downloaded.April2013.rda"
-    )
-
+#save(
+#    gse6364.d, 
+#    gse6364.s, 
+#    gse7307.d, 
+#    gse7307.s, 
+#    gse7305.d, 
+#    gse7305.s, 
+#    tothill.d, 
+#    tothill.s, 
+#    gse6008.d, 
+#    gse6008.s,
+#    gse5108.s,
+#    gse5108.d, 
+#    gse23339.s,
+#    gse23339.d,
+#    file="GEOfiles_associated_withENDO.downloaded.April2013.rda"
+#    )
 
 ###start from here#####
 setwd("/data/htorres/kate")
 load(file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
 
 ## New Src signature data frame
-Src.signature = read.table('src_signature.txt', sep='\t') #from suplemental table1
+Src.signature = read.table('src_signature.txt', sep='\t') #from Bild et al 2006 suplemental table1
 colnames(Src.signature) = c('ProbeID', 'GeneSymbol', 'Description', 'LocusLink', 'FoldChange')
 ### adjust this criteria
 Src.signature$logFC <- log2(Src.signature$FoldChange)
@@ -131,29 +136,39 @@ Src.signature$direction[Src.signature$logFC<0] <- c("DN.BILD") # just to denote 
 Src.signature$direction[Src.signature$logFC>0] <- c("UP.BILD")
 src = Src.signature
 
-#a third more complete src signature file from http://david.abcc.ncifcrf.gov/
-david.src = read.table('David.Src.txt', header=T)
-david.src$To=as.character(david.src$To)
+# src Gene signature file 
+# obtained by conveting affy probe names of each platform with DAVID (http://david.abcc.ncifcrf.gov/)
+david.src = read.table('David.Src.txt', header=T) #maybe I should use the corresponding R/BioC Annotation package for consistency
+david.src$To=toupper(as.character(david.src$To))
+david.src = david.src[,c(2,1)] #inverting column order because I am going to add probe names of other platforms
+# getting illumina IDs:
+# davidIllumina <- read.table('david_affy_illumina.txt', header=T, sep='\t') #submitted david.src$From to DAVID conversion tool and got Illumina IDs 
 
-##src signature #Bild et al. 2006
-#src <- read.delim(file="bild.src.txt") #where did this file come from? Maybe GSE3151
-length(intersect(src[,1], dimnames(tothill.d)[[1]]))
-length(intersect(src[,1], dimnames(gse6008.d)[[1]]))
-length(intersect(src[,1], dimnames(gse7305.d)[[1]]))
-length(intersect(src[,1], dimnames(gse7307.d)[[1]]))
-length(intersect(src[,1], dimnames(gse6364.d)[[1]]))
+# used to subset Codelink probeIDs:
+tmp <- unlist(
+    mget(david.src$To, revmap(hwgcodSYMBOL), ifnotfound=NA),
+    use.names=F
+    )
+codelinkSrc <- unique(tmp[!is.na(tmp)]) # GE/Amersham probe IDs corresponding to affy U133 v2.0
+rm(tmp)
+
 #get probe specific to SRC signature
 gse6008.src.probe <- intersect(src[,1], dimnames(gse6008.d)[[1]])
 tothill.src.probe <- intersect(src[,1], dimnames(tothill.d)[[1]])
 gse7305.src.probe <- intersect(src[,1], dimnames(gse7305.d)[[1]])
 gse7307.src.probe <- intersect(src[,1], dimnames(gse7307.d)[[1]])
 gse6364.src.probe <- intersect(src[,1], dimnames(gse6364.d)[[1]])
+#The probenames should be prefixed by 'GE' but for some reason its not. WARNING! Verify why.
+rownames(gse5108.d) <- paste("GE",  rownames(gse5108.d), sep='') 
+gse5108.src.probe <- intersect(codelinkSrc, dimnames(gse5108.d)[[1]])
+
 #subset data to only SRC specific and create dataframe. 
 tothill.src <- tothill.d[tothill.src.probe,]; tothill.src <- as.data.frame(tothill.src)
 gse6008.src <- gse6008.d[gse6008.src.probe,]; gse6008.src <- as.data.frame(gse6008.src)
 gse6364.src <- gse6364.d[gse6364.src.probe,]; gse6364.src <- as.data.frame(gse6364.src)
 gse7307.src <- gse7307.d[gse7307.src.probe,]; gse7307.src <- as.data.frame(gse7307.src)
 gse7305.src <- gse7305.d[gse7305.src.probe,]; gse7305.src <- as.data.frame(gse7305.src)
+gse5108.src <- as.data.frame(gse5108.d[gse5108.src.probe,])
 
 sort.data.frame <- function(x, key, ...) {
 	if (missing(key)) {
@@ -165,7 +180,7 @@ sort.data.frame <- function(x, key, ...) {
 	}
 }
 
-##cleanup sample manifest #metadata)
+##cleanup sample manifest #metadata) # WARNING: I Don't understand this section
 tothill.nn <- strsplit(as.character(tothill.s$characteristics_ch1), " : ")
 tothill.nnn <- as.data.frame(as.character(unlist(lapply((tothill.nn), "[", 2) )))
 tothill.s$characteristics_ch1a <- tothill.nnn[,1]
@@ -183,8 +198,7 @@ gse7305.nn <- strsplit(as.character(gse7305.s$characteristics_ch1), " ")
 gse7305.nnn <- as.data.frame(as.character(unlist(lapply((gse7305.nn), "[", 1) )))
 gse7305.s$characteristics_ch1a <- gse7305.nnn[,1]
 
-
-#This repetitive block I will refactor into a function.
+# why do we need to do this? 
 tothill.s.sort <- sort.data.frame(tothill.s[,c("geo_accession","characteristics_ch1a")], 
 	key = "characteristics_ch1a")
 gse6008.s.sort <- sort.data.frame(gse6008.s[,c("geo_accession","characteristics_ch1a")], 
@@ -195,11 +209,8 @@ gse7307.s.sort <- sort.data.frame(gse7307.s[,c("Sample","characteristics_ch1a")]
 key = "characteristics_ch1a")
 gse7305.s.sort <- sort.data.frame(gse7305.s[,c("geo_accession","characteristics_ch1a")], 
 	key = "characteristics_ch1a")
-
-#tothill.gse6008.src <- cbind(tothill.d[gse6008.src.probe,], gse6008.d[gse6008.src.probe,]); tothill.gse6008.src <- as.data.frame(tothill.gse6008.src) ## combining two dataset on common src probe
-
-#tothill.gse6008.src.sort <- tothill.gse6008.src[,c(tothill.s.sort[,1],gse6008.s.sort[,1])]
-
+gse5108.s.sort <- sort.data.frame(gse5108.s[,c("geo_accession","characteristics_ch1")], 
+	key = "characteristics_ch1a")
 
 ## ColSideColors
 color.map.tothill.type <- function(mol.biol) {
@@ -227,14 +238,19 @@ color.map.gse7305.type <- function(mol.biol) {
 	else "#FFFFFF"
 } #
 color.map.gse6364.type <- function(mol.biol) {
-	if (mol.biol=="Early Secretory Phase Endometriosis") "red" #red
-	else if (mol.biol=="Proliferative Phase Endometriosis") "red" #red
-	else if (mol.biol=="Mid Secretory Phase Endometriosis") "red" #red
+	if (mol.biol=="Early Secretory Phase Endometriosis") "red"
+	else if (mol.biol=="Proliferative Phase Endometriosis") "red" 
+	else if (mol.biol=="Mid Secretory Phase Endometriosis") "red" 
 	else if (mol.biol=="Mid Secretory Phase Normal") "#9C897E" 
 	else if (mol.biol=="Proliferative Phase Normal") "#9C897E" 
 	else if (mol.biol=="Early Secretory Phase Normal") "#9C897E" 
 	else "#FFFFFF"
-} #
+} 
+color.map.gse5108.type <- function(mol.biol) {
+    if (str_detect(mol.biol, 'endometriosis')) "red"
+    else if (str_detect(mol.biol, 'eutopic endometrium') "#9C897E" #grey
+    else #FFFFFF
+}
 
 #rowsidecolors 
 bildColors.colorize <- function(abbrv){ 
@@ -255,8 +271,7 @@ build.side.map = function(df){
 	df$ProbeID = dimnames(df)[[1]]
     Src.signature$ProbeID <- as.character(Src.signature$ProbeID)
     # The following line was messing up the row (probes) ordering
-	#src.sig <- merge(df, Src.signature, by.x = 'id', by.y = 'ProbeID', all.x = T, sort=F) 
-    src.sig <- join(df, Src.signature, by=c("ProbeID")) # match='first') 
+    src.sig <- join(df, Src.signature, by=c("ProbeID"))  
 	src.sig$Ldirection = NA # our expression directionality vector
 	src.sig$Ldirection[src.sig$FC<0]  <- c("DN.KL") 
 	src.sig$Ldirection[src.sig$FC>0] <- c("UP.KL")
@@ -647,7 +662,6 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
 #		)
 #dev.off()
 
-
 #this table compares our analysis with Bilds's
 #tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
 
@@ -664,7 +678,6 @@ tttt$mean.T <- tttt.t
 pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 tttt$p.value <- as.numeric(pv)
 tttt$FC <- tttt$mean.T - tttt$mean.N
-
 
 ### Plotting
 plotVolcano(tttt,
@@ -688,11 +701,6 @@ gse7307.norm <- as.character(subset(gse7307.s.sort,
     characteristics_ch1a=="endometrium")$Sample)
 gse7307.tum <- as.character(subset(gse7307.s.sort, 
     characteristics_ch1a=="endometrium/ovary")$Sample)
-tt <- cbind(tt[,gse7307.norm],tt[,gse7307.tum]) 
-tt <- log2(tt);
-pv.tt <- apply(tt, 1, func.list$studentT, s1=c(gse7307.norm),s2=c(gse7307.tum))
-tt$p.value <- as.numeric(pv.tt)
-tt.n <- apply(tt[,gse7307.norm], 1, mean, na.rm=T); tt$mean.N <- tt.n
 tt.t <- apply(tt[,gse7307.tum], 1, mean, na.rm=T); tt$mean.T <- tt.t
 tt$FC <- tt$mean.T - tt$mean.N
 ### Plotting
@@ -740,3 +748,8 @@ gse6364.hvb <- plotBildDirectionality(ttt, gse6364.s, color.map.gse6364.type,
     filename = 'gse6364.bild.sorted.svg'
     )
 
+### Preprocessing GSE5108
+df5108 <- as.matrix(gse5108.src[,as.character(gse5108.s.sort[,1])])
+df5108 <- as.data.frame(df5108) 
+#tumors #TODO: calculate means and p values of tumors and normals
+#df5108t <-
