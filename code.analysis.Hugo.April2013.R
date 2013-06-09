@@ -120,7 +120,7 @@ options(stringsAsFactors=FALSE)
 
 ####start from here#####
 setwd("/data/htorres/kate")
-#load(file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
+load(file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
 #
 ### New Src signature data frame
 Src.signature = read.table('src_signature.txt', sep='\t') #from Bild et al 2006 suplemental table1
@@ -173,7 +173,7 @@ gse6008.src <- gse6008.d[gse6008.src.probe,]; gse6008.src <- as.data.frame(gse60
 gse6364.src <- gse6364.d[gse6364.src.probe,]; gse6364.src <- as.data.frame(gse6364.src)
 gse7307.src <- gse7307.d[gse7307.src.probe,]; gse7307.src <- as.data.frame(gse7307.src)
 gse7305.src <- gse7305.d[gse7305.src.probe,]; gse7305.src <- as.data.frame(gse7305.src)
-##gse5108.src <- as.data.frame(gse5108.d[gse5108.src.probe,])
+gse5108.src <- as.data.frame(gse5108.d[gse5108.src.probe,])
 
 
 #WHat does this do? clueless..
@@ -303,7 +303,22 @@ build.side.map.plus <- function(df, probemap) {
     df$probeID <- rownames(df)
     df$GeneSymbol <- unlist( mget(df$probeID, probemap), use.names=F )
     #having the geneSymbol, lookup whats the gene expression directionality in the Src.signature
-    df$direction = Src.Signature[match(affyprobes, Src.Signature$ProbeID)]
+    indices <- match(df$GeneSymbol, Src.signature$GeneSymbol)
+    df$direction <- Src.signature$direction[indices]
+    df$direction[is.na(df$direction)] <- 'unknown' #DAVID makes ZN12 disappear! DISCUSS with Houtan how we should proceed.
+    df$Ldirection <- NA
+    df$Ldirection[df$FC > 0] <- c('DN.KL')
+	df$Ldirection[df$FC>0] <- c("UP.KL")
+	df$Lsignificance[df$p.value<=0.05] <- c("Significant")
+	#I want the white color to mark the statistically insignificant cases, so:
+	df$Ldirection[which(is.na(df$Lsignificance))] <- 'insignificant'
+    df$Ldirection[is.na(df$Ldirection)] <- 'unknown' #DAVID makes ZN12 disappear!
+	bildColors = unlist(lapply(df$direction, bildColors.colorize))
+	klColors = unlist(lapply(df$Ldirection, klColors.colorize))
+	colors = cbind(bildColors,klColors)
+	colnames(colors) = c('Bild et al.', 'Lawrenson et al.')
+	return(colors) 
+}
 
 build.top.map = function(df, df.s, df.colormap.function){
 	#builds the heatmap top rows for helping group visualization
@@ -330,6 +345,27 @@ build.top.map = function(df, df.s, df.colormap.function){
 			ncol = 1)
 	ColSideColors = cbind(ColSideColors, ColSideColors) #2columns make it thicker 
 	return(ColSideColors)
+}
+
+removeColumns <- function(df) {
+    #removes spurious columns that get in the way of plotting just the samples
+	## df is the full dataframe, with FC and P values
+    filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
+    # R syntax can become ugly. This is how I acchieve removal by colname
+    filterout <-
+    -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
+    df <- df[,filterout]
+    return(df)
+}
+
+build.top.map.plus <- function(df, df.s.sort, df.colormap.function) {
+    df <- removeColumns(df)    
+    colors <- unlist(lapply(df.s.sort$characteristics_ch1a, df.colormap.function)) 
+	ColSideColors = matrix(as.character(c(colors)), 
+			nrow = length(colors),
+			ncol = 1)
+    colors <- cbind(ColSideColors, ColSideColors)
+    return(colors)
 }
 
 srcGeneLookup <- function(probes) {
