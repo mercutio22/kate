@@ -296,12 +296,12 @@ build.side.map = function(df){
 	return(colors)
 }
 
-build.side.map.plus <- function(df, probemap) {
+build.side.map.plus <- function(df, probemap=hgu133plus2GENENAME) {
 	### takes dataframe, merges with the david.src signature and creates RowSideColors for our plots
 	## df is the Bild SRC subsetted GSE dataframe, with samples, FC, mean.T, mean.N and p.value
     ## probe2geneSymbol.db is a biocondutor "bimap" annotation object such as hgu133plus2GENENAME 
     df$probeID <- rownames(df)
-    df$GeneSymbol <- unlist( mget(df$probeID, probemap), use.names=F )
+    df$GeneSymbol <- unlist( mget(df$probeID, probemap, ifnotfound=NA), use.names=F )
     #having the geneSymbol, lookup whats the gene expression directionality in the Src.signature
     indices <- match(df$GeneSymbol, Src.signature$GeneSymbol)
     df$direction <- Src.signature$direction[indices]
@@ -358,15 +358,15 @@ removeColumns <- function(df) {
     return(df)
 }
 
-build.top.map.plus <- function(df, df.s.sort, df.colormap.function) {
-    df <- removeColumns(df)    
-    colors <- unlist(lapply(df.s.sort$characteristics_ch1a, df.colormap.function)) 
-	ColSideColors = matrix(as.character(c(colors)), 
-			nrow = length(colors),
-			ncol = 1)
-    colors <- cbind(ColSideColors, ColSideColors)
-    return(colors)
-}
+#build.top.map.plus <- function(df, df.s.sort, df.colormap.function) {
+#    df <- removeColumns(df)    
+#    colors <- unlist(lapply(df.s.sort$characteristics_ch1a, df.colormap.function)) 
+#	ColSideColors = matrix(as.character(c(colors)), 
+#			nrow = length(colors),
+#			ncol = 1)
+#    colors <- cbind(ColSideColors, ColSideColors)
+#    return(colors)
+#}
 
 srcGeneLookup <- function(probes) {
     return(
@@ -383,7 +383,7 @@ srcGeneLookup <- function(probes) {
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 volcano.plus<-
 function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1, 
-    fold.cut2, pv.adj.col,ncolors=1, text=NA, angle=-45) {
+    fold.cut2, pv.adj.col,ncolors=1, text=NA, angle=-45, probemap=hgu133plus2SYMBOL) {
     #text <-- a logical vector used to subset x    
     #cut.line <-- p.value cutoff line (not log10 transformed)
 
@@ -481,13 +481,17 @@ function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1,
             abline(v= fold.cut1, lty=3, lwd=1, col="black")
             abline(v= fold.cut2, lty=3, lwd=1, col="black")
         }
-        if(!is.na(text[1])){
-            probes = rownames(tttt)[text]
+        if( !all(is.na(text)) ){
+            probes = rownames(df)[text]
             text(M[text],
                 -log10(p[text]), 
                 #labels=probes,
                 #My hack for labeling kate's data according to gene symbols
-                labels=srcGeneLookup(probes),
+                #labels=srcGeneLookup(probes),
+                labels=unlist(
+                    mget(probes, probemap, ifnotfound=NA), 
+                    use.names=F
+                    ),
                 cex=0.5,
                 srt=angle,
                 offset=0.25,
@@ -527,9 +531,12 @@ function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1,
     }   
     par(op)
 }
-plotVolcano <- function(df, filename='volcano.svg', title='Volcano Plot') {
+plotVolcano <- function(df, filename='volcano.svg', 
+    title='Volcano Plot', 
+    probemap=hgu133plus2SYMBOL) {
     #custom volcano plot customized for kate's analysis
-    svg(filename=filename)
+    #svg(filename=filename)
+    png(filename=filename)
     volcano.plus(df, 
         fold.change.col = "FC", 
         pv.col = "p.value", 
@@ -546,7 +553,7 @@ plotVolcano <- function(df, filename='volcano.svg', title='Volcano Plot') {
     dev.off()
 } 
 plotHeatmap <-
-function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
+function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=hgu133plus2SYMBOL) {
     svg(filename=filename)
     #colnames I always want removed:
     filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
@@ -560,7 +567,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
         scale="none",
         #scale="row",
         ColSideColors=build.top.map(df, df.s, colormap),
-        RowSideColors=build.side.map(df), # most differentially expressed genes
+        RowSideColors=build.side.map.plus(df, probemap), # most differentially expressed genes
         col=jet.colors(75),
         key=FALSE,
         #key=T, 
@@ -581,7 +588,8 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
             "Samples"
             ),
         #labCol=NA
-        labRow=srcGeneLookup(rownames(df)),
+        #labRow=srcGeneLookup(rownames(df)),
+        labRow=unlist(mget(rownames(df5108), probemap), use.names=F),
         margin = c(10,10)
     )
     dev.off()
@@ -704,94 +712,95 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
 #this table compares our analysis with Bilds's
 #tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
 
-### Preprocessing GSE7305
-tttt <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
-#tttt <- tttt[-4,]  #"1556499_s_ati probe" an outlier that skews the coloring!
-tttt <- tttt[-which(rownames(tttt) == "1556499_s_at"),] 
-tttt <- as.data.frame(tttt);
-tttt <- log2(tttt);
-tttt.n <- apply(tttt[,1:10], 1, mean, na.rm=T); 
-tttt$mean.N <- tttt.n
-tttt.t <- apply(tttt[,11:20], 1, mean, na.rm=T); 
-tttt$mean.T <- tttt.t
-pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
-tttt$p.value <- as.numeric(pv)
-tttt$FC <- tttt$mean.T - tttt$mean.N
-
-### Plotting
-plotVolcano(tttt,
-    title="Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
-    filename='gse7305.volcano.svg'
-    )
-gse7305.hv <- plotHeatmap(tttt, gse7305.s, color.map.gse7305.type,
-    title = 'GSE7305',
-    filename = 'gse7305.heatmap.svg'
-    )
-gse7305.hvb <- plotBildDirectionality(tttt, gse7305.s, color.map.gse7305.type,
-    title = 'GSE7305 Bild Sorted',
-    filename = 'gse7305.bild.sorted.svg'
-    )
-
-### Preprocessing GSE7307
-tt <- as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])])
-tt <- tt[-which(rownames(tt) == "1556499_s_at"),] 
-tt <- as.data.frame(tt);
-gse7307.norm <- as.character(subset(gse7307.s.sort, 
-    characteristics_ch1a=="endometrium")$Sample)
-gse7307.tum <- as.character(subset(gse7307.s.sort, 
-    characteristics_ch1a=="endometrium/ovary")$Sample)
-tt.t <- apply(tt[,gse7307.tum], 1, mean, na.rm=T); tt$mean.T <- tt.t
-tt$FC <- tt$mean.T - tt$mean.N
-### Plotting
-plotVolcano(tt,
-    title = "Volcano Plot, Endometrium/Ovary vs Endometrium (GSE7307)",
-    filename = 'gse7307.volcano.svg'
-    )
-gse7307.hv <- plotHeatmap(tt, gse7307.s, color.map.gse7307.type,
-    title = 'GSE7307',
-    filename = 'gse7307.heatmap.svg'
-    )
-gse7307.hvb <- plotBildDirectionality(tt, gse7307.s, color.map.gse7307.type,
-    title = 'GSE7307 Bild Sorted',
-    filename = 'gse7307.bild.sorted.svg'
-    )
-
-### Preprocessing GSE6364
-ttt <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
-ttt <- ttt[-which(rownames(ttt) == "1556499_s_at"),] # outlier
-ttt <- as.data.frame(ttt);
-ttt <- log2(ttt);
-#normals
-ttt.n = ttt[,as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])]
-#tumors
-ttt.t = ttt[,as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])]
-ttt.n.mean <- apply(ttt.n, 1, mean, na.rm=T) 
-ttt.t.mean <- apply(ttt.t, 1, mean, na.rm=T) 
-ttt = cbind(ttt.n, ttt.t)
-ttt$mean.T <- ttt.t.mean
-ttt$mean.N <- ttt.n.mean
-pv.ttt <- apply(ttt, 1, func.list$studentT, s1=c(as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])),s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])))
-ttt$p.value <- as.numeric(pv.ttt)
-ttt$FC <- ttt$mean.T - ttt$mean.N
-### Plotting
-plotVolcano(ttt,
-    title = "Volcano Plot, Endometriosis vs Normal (GSE6364)",
-    filename = 'gse6364.volcano.svg'
-    )
-gse6364.hv <- plotHeatmap(ttt, gse6364.s, color.map.gse6364.type,
-    title = 'GSE6364',
-    filename = 'gse6364.heatmap.svg'
-    )
-gse6364.hvb <- plotBildDirectionality(ttt, gse6364.s, color.map.gse6364.type,
-    title = 'GSE6364 Bild Sorted',
-    filename = 'gse6364.bild.sorted.svg'
-    )
+#### Preprocessing GSE7305
+#tttt <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
+##tttt <- tttt[-4,]  #"1556499_s_ati probe" an outlier that skews the coloring!
+#tttt <- tttt[-which(rownames(tttt) == "1556499_s_at"),] 
+#tttt <- as.data.frame(tttt);
+#tttt <- log2(tttt);
+#tttt.n <- apply(tttt[,1:10], 1, mean, na.rm=T); 
+#tttt$mean.N <- tttt.n
+#tttt.t <- apply(tttt[,11:20], 1, mean, na.rm=T); 
+#tttt$mean.T <- tttt.t
+#pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
+#tttt$p.value <- as.numeric(pv)
+#tttt$FC <- tttt$mean.T - tttt$mean.N
+#
+#### Plotting
+#plotVolcano(tttt,
+#    title="Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
+#    filename='gse7305.volcano.svg'
+#    )
+#gse7305.hv <- plotHeatmap(tttt, gse7305.s, color.map.gse7305.type,
+#    title = 'GSE7305',
+#    filename = 'gse7305.heatmap.svg'
+#    )
+#gse7305.hvb <- plotBildDirectionality(tttt, gse7305.s, color.map.gse7305.type,
+#    title = 'GSE7305 Bild Sorted',
+#    filename = 'gse7305.bild.sorted.svg'
+#    )
+#
+#### Preprocessing GSE7307
+#tt <- as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])])
+#tt <- tt[-which(rownames(tt) == "1556499_s_at"),] 
+#tt <- as.data.frame(tt);
+#gse7307.norm <- as.character(subset(gse7307.s.sort, 
+#    characteristics_ch1a=="endometrium")$Sample)
+#gse7307.tum <- as.character(subset(gse7307.s.sort, 
+#    characteristics_ch1a=="endometrium/ovary")$Sample)
+#tt.t <- apply(tt[,gse7307.tum], 1, mean, na.rm=T); tt$mean.T <- tt.t
+#tt$FC <- tt$mean.T - tt$mean.N
+#### Plotting
+#plotVolcano(tt,
+#    title = "Volcano Plot, Endometrium/Ovary vs Endometrium (GSE7307)",
+#    filename = 'gse7307.volcano.svg'
+#    )
+#gse7307.hv <- plotHeatmap(tt, gse7307.s, color.map.gse7307.type,
+#    title = 'GSE7307',
+#    filename = 'gse7307.heatmap.svg'
+#    )
+#gse7307.hvb <- plotBildDirectionality(tt, gse7307.s, color.map.gse7307.type,
+#    title = 'GSE7307 Bild Sorted',
+#    filename = 'gse7307.bild.sorted.svg'
+#    )
+#
+#### Preprocessing GSE6364
+#ttt <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
+#ttt <- ttt[-which(rownames(ttt) == "1556499_s_at"),] # outlier
+#ttt <- as.data.frame(ttt);
+#ttt <- log2(ttt);
+##normals
+#ttt.n = ttt[,as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])]
+##tumors
+#ttt.t = ttt[,as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])]
+#ttt.n.mean <- apply(ttt.n, 1, mean, na.rm=T) 
+#ttt.t.mean <- apply(ttt.t, 1, mean, na.rm=T) 
+#ttt = cbind(ttt.n, ttt.t)
+#ttt$mean.T <- ttt.t.mean
+#ttt$mean.N <- ttt.n.mean
+#pv.ttt <- apply(ttt, 1, func.list$studentT, s1=c(as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])),s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])))
+#ttt$p.value <- as.numeric(pv.ttt)
+#ttt$FC <- ttt$mean.T - ttt$mean.N
+#### Plotting
+#plotVolcano(ttt,
+#    title = "Volcano Plot, Endometriosis vs Normal (GSE6364)",
+#    filename = 'gse6364.volcano.svg'
+#    )
+#gse6364.hv <- plotHeatmap(ttt, gse6364.s, color.map.gse6364.type,
+#    title = 'GSE6364',
+#    filename = 'gse6364.heatmap.svg'
+#    )
+#gse6364.hvb <- plotBildDirectionality(ttt, gse6364.s, color.map.gse6364.type,
+#    title = 'GSE6364 Bild Sorted',
+#    filename = 'gse6364.bild.sorted.svg'
+#    )
 
 ## Preprocessing GSE5108
 df5108 <- as.matrix(gse5108.src[,as.character(gse5108.s.sort[,1])])
 df5108 <- as.data.frame(df5108) 
 ColNormals <- which(str_detect(gse5108.s.sort$characteristics_ch1, 'endometriosis')) 
 ColTumors <- which(str_detect(gse5108.s.sort$characteristics_ch1, 'eutopic endometrium')) 
+df5108 <- df5108[,c(ColNormals, ColTumors)]
 df5108$mean.T <- apply(df5108[,ColTumors], 1, mean, na.rm=T)
 df5108$mean.N <- apply(df5108[,ColNormals], 1, mean, na.rm=T)
 df5108$p.value <- as.numeric(
@@ -801,48 +810,11 @@ df5108$FC <- df5108$mean.T - df5108$mean.N
 #plotting
 plotVolcano(df5108,
     title='GSE5108 SRC genes: Endometriosis vs eutopic endometrium',
-    filename='gse5108.volcano.svg'
+    #filename='gse5108.volcano.svg'
+    filename='gse5108.volcano.png'
     )
-gse5108.hv <- plotHeatmap(df5108, gse5108.s, color.map.gse5108.type,
+gse5108.hv <- plotHeatmap(df5108, gse5108.s, color.map.gse5108.type, 
+    probemap=hwgcodSYMBOL,
     title='GSE5108',
     filename='gse5108.heatmap.svg'
     )
-##heatmap
-svg(filename=gse5108.heatmap.svg)
-#colnames I always want removed:
-filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
-# R syntax can become ugly. This is how I acchieve removal by colname
-filterout <-
--1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
-filtered = df5108[,filterout]
-hv <- heatmap.plus(
-    as.matrix(filtered), # PLOTS ONLY THE SAMPLE COLUMNS
-    na.rm=TRUE,
-    scale="none",
-    #scale="row",
-    ColSideColors=build.top.map(df, df.s, colormap),
-    RowSideColors=build.side.map(df), # most differentially expressed genes
-    col=jet.colors(75),
-    key=FALSE,
-    #key=T, 
-    symkey=FALSE,
-    #symkey=T,
-    density.info="none",
-    trace="none",
-    Rowv=TRUE,
-    Colv=NA,
-    cexRow=0.6,
-    cexCol=0.6,
-    keysize=2,
-    dendrogram=c("none"),
-    main = paste(title,
-        dim(filtered)[1],
-        "Probes; ",
-        dim(filtered)[2],
-        "Samples"
-        ),
-    #labCol=NA
-    labRow=srcGeneLookup(rownames(df)),
-    margin = c(10,10)
-)
-dev.off()
