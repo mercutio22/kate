@@ -7,6 +7,7 @@ library(stringr)
 library(plyr)
 library("hgu133plus2.db") # Affymetrix Human Genome U133 Plus 2.0 Array annotation data
 library("hwgcod.db") # GE/Amersham Codelink Human Whole Genome Bioarray 
+library("hgug4112a.db") # 
 options(stringsAsFactors=FALSE)
 
 ###tothill data
@@ -137,8 +138,7 @@ Src.signature$direction[Src.signature$logFC>0] <- c("UP.BILD")
 # obtained by conveting affy probe names of each platform with DAVID (http://david.abcc.ncifcrf.gov/)
 david.src = read.table('David.Src.txt', header=T) #maybe I should use the corresponding R/BioC Annotation package for consistency
 david.src$To=toupper(as.character(david.src$To))
-david.src = david.src[,c(2,1)] #inverting column order because I am going to add probe names of other platforms
-colnames(david.src) <- c('GeneSymbol', 'affyProbe')
+colnames(david.src) <- c('affyProbe', 'GeneSymbol')
 # getting illumina IDs:
 # davidIllumina <- read.table('david_affy_illumina.txt', header=T, sep='\t') #submitted david.src$From to DAVID conversion tool and got Illumina IDs 
 #update Src.signature with updated gene symbols
@@ -368,27 +368,27 @@ removeColumns <- function(df) {
 #    return(colors)
 #}
 
-#srcGeneLookup <- function(probes) {
-#    return(
-#        as.character(unlist(
-#            lapply(probes, func.list$vlookup, david.src, 'GeneSymbol')
-#            )
-#        )
-#    )
-#}
-srcGeneLookup <- function(affyP) {
-    indices <- unlist(lapply(david.src$affyProbe, match, affyP), use.names=F)
-    genes <- (david.src$GeneSymbol[indices])
-    genes[is.na(genes)] <- 'unknown'
-    return(genes)
-}   
+srcGeneLookup <- function(probes) {
+    return(
+        as.character(unlist(
+            lapply(probes, func.list$vlookup, david.src, 'GeneSymbol')
+            )
+        )
+    )
+}
+#srcGeneLookup.plus <- function(affyP) {
+#    indices <- unlist(lapply(david.src$affyProbe, match, affyP), use.names=F)
+#    genes <- (david.src$GeneSymbol[indices])
+#    genes[is.na(genes)] <- 'unknown'
+#    return(genes)
+#}   
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### make volcano plot plus
+### make volcano plot plus ##TODO: GENESYMBOL MAPPING NOT WORKING
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 volcano.plus<-
 function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1, 
-    fold.cut2, pv.adj.col,ncolors=1, text=NA, angle=-45, probemap=hgu133plus2SYMBOL) {
+    fold.cut2, pv.adj.col,ncolors=1, text=NA, angle=-45, probemap=NA) {
     #text <-- a logical vector used to subset x    
     #cut.line <-- p.value cutoff line (not log10 transformed)
 
@@ -478,25 +478,22 @@ function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1,
                 points(M[upr], -log10(p[upr]), col=Rcol[ncolors],cex=1,pch=20)
                 points(M[dwr], -log10(p[dwr]), col=Gcol[ncolors],cex=1,pch=20)         
             }
-
-            #points(M[upr], -log10(p[upr]), col="red")
-            #points(M[dwr], -log10(p[dwr]), col="green")
-
             abline(h= -log10(cut.line), lty=3, lwd=1)
             abline(v= fold.cut1, lty=3, lwd=1, col="black")
             abline(v= fold.cut2, lty=3, lwd=1, col="black")
         }
         if( !all(is.na(text)) ){
-            probes = rownames(df)[text]
+            probes <- rownames(df)[text]
+            if (is.na(probemap) | missing(probemap) ) { 
+                labels <- srcGeneLookup(probes)
+            } else {
+                labels <- unlist(
+                    mget(probes, probemap, ifnotfound=NA), 
+                    use.names=F)
+            }
             text(M[text],
                 -log10(p[text]), 
-                #labels=probes,
-                #My hack for labeling kate's data according to gene symbols
-                labels=srcGeneLookup(probes),
-#                labels=unlist(
-#                    mget(probes, probemap, ifnotfound=NA), 
-#                    use.names=F
-#                    ),
+                labels=labels,
                 cex=0.5,
                 srt=angle,
                 offset=0.25,
@@ -739,72 +736,78 @@ df7305$FC <- df7305$mean.T - df7305$mean.N
 plotVolcano(df7305,
     title="Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
     filename='gse7305.volcano.svg'
-    #filename='gse7305.volcano.png'
     )
 gse7305.hv <- plotHeatmap(df7305, gse7305.s, 
     colormap=color.map.gse7305.type,
     title = 'GSE7305',
     filename = 'gse7305.heatmap.svg'
     )
-#gse7305.hvb <- plotBildDirectionality(df7305, gse7305.s, color.map.gse7305.type,
-#    title = 'GSE7305 Bild Sorted',
-#    filename = 'gse7305.bild.sorted.svg'
-#    )
-#
-#### Preprocessing GSE7307
-#tt <- as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])])
-#tt <- tt[-which(rownames(tt) == "1556499_s_at"),] 
-#tt <- as.data.frame(tt);
-#gse7307.norm <- as.character(subset(gse7307.s.sort, 
-#    characteristics_ch1a=="endometrium")$Sample)
-#gse7307.tum <- as.character(subset(gse7307.s.sort, 
-#    characteristics_ch1a=="endometrium/ovary")$Sample)
-#tt.t <- apply(tt[,gse7307.tum], 1, mean, na.rm=T); tt$mean.T <- tt.t
-#tt$FC <- tt$mean.T - tt$mean.N
-#### Plotting
-#plotVolcano(tt,
-#    title = "Volcano Plot, Endometrium/Ovary vs Endometrium (GSE7307)",
-#    filename = 'gse7307.volcano.svg'
-#    )
-#gse7307.hv <- plotHeatmap(tt, gse7307.s, color.map.gse7307.type,
-#    title = 'GSE7307',
-#    filename = 'gse7307.heatmap.svg'
-#    )
-#gse7307.hvb <- plotBildDirectionality(tt, gse7307.s, color.map.gse7307.type,
-#    title = 'GSE7307 Bild Sorted',
-#    filename = 'gse7307.bild.sorted.svg'
-#    )
-#
-#### Preprocessing GSE6364
-#ttt <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
-#ttt <- ttt[-which(rownames(ttt) == "1556499_s_at"),] # outlier
-#ttt <- as.data.frame(ttt);
-#ttt <- log2(ttt);
-##normals
-#ttt.n = ttt[,as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])]
-##tumors
-#ttt.t = ttt[,as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])]
-#ttt.n.mean <- apply(ttt.n, 1, mean, na.rm=T) 
-#ttt.t.mean <- apply(ttt.t, 1, mean, na.rm=T) 
-#ttt = cbind(ttt.n, ttt.t)
-#ttt$mean.T <- ttt.t.mean
-#ttt$mean.N <- ttt.n.mean
-#pv.ttt <- apply(ttt, 1, func.list$studentT, s1=c(as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])),s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])))
-#ttt$p.value <- as.numeric(pv.ttt)
-#ttt$FC <- ttt$mean.T - ttt$mean.N
-#### Plotting
-#plotVolcano(ttt,
-#    title = "Volcano Plot, Endometriosis vs Normal (GSE6364)",
-#    filename = 'gse6364.volcano.svg'
-#    )
-#gse6364.hv <- plotHeatmap(ttt, gse6364.s, color.map.gse6364.type,
-#    title = 'GSE6364',
-#    filename = 'gse6364.heatmap.svg'
-#    )
-#gse6364.hvb <- plotBildDirectionality(ttt, gse6364.s, color.map.gse6364.type,
-#    title = 'GSE6364 Bild Sorted',
-#    filename = 'gse6364.bild.sorted.svg'
-#    )
+gse7305.hvb <- plotBildDirectionality(df7305, gse7305.s, color.map.gse7305.type,
+    title = 'GSE7305 Bild Sorted',
+    filename = 'gse7305.bild.sorted.svg'
+    )
+
+### Preprocessing GSE7307
+df7307 <- as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])])
+df7307 <- df7307[-which(rownames(df7307) == "1556499_s_at"),] 
+df7307 <- as.data.frame(df7307);
+gse7307.norm <- as.character(subset(gse7307.s.sort, 
+    characteristics_ch1a=="endometrium")$Sample)
+gse7307.tum <- as.character(subset(gse7307.s.sort, 
+    characteristics_ch1a=="endometrium/ovary")$Sample)
+df7307 <- cbind.data.frame(df7307[gse7307.norm], df7307[gse7307.tum])
+df7307$mean.N <- apply(df7307[,gse7307.norm], 1, mean, na.rm=T)
+df7307$mean.T <- apply(df7307[,gse7307.tum], 1, mean, na.rm=T)
+pv.7307 <- apply(df7307, 1, func.list$studentT, s1=c(gse7307.norm),s2=c(gse7307.tum))
+df7307$p.value <- as.numeric(pv.7307)
+df7307$FC <- df7307$mean.T - df7307$mean.N
+### Plotting
+plotVolcano(df7307,
+    title = "Volcano Plot, Endometrium/Ovary vs Endometrium (GSE7307)",
+    filename = 'gse7307.volcano.svg'
+    )
+gse7307.hv <- plotHeatmap(df7307, gse7307.s, color.map.gse7307.type,
+    title = 'GSE7307',
+    filename = 'gse7307.heatmap.svg'
+    )
+gse7307.hvb <- plotBildDirectionality(df7307, gse7307.s, color.map.gse7307.type,
+    title = 'GSE7307 Bild Sorted',
+    filename = 'gse7307.bild.sorted.svg'
+    )
+
+
+### Preprocessing GSE6364
+df6364 <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
+df6364 <- df6364[-which(rownames(df6364) == "1556499_s_at"),] # outlier
+df6364 <- as.data.frame(df6364);
+df6364 <- log2(df6364);
+#normals
+df6364.n = df6364[,as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])]
+#tumors
+df6364.t = df6364[,as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])]
+df6364.n.mean <- apply(df6364.n, 1, mean, na.rm=T) 
+df6364.t.mean <- apply(df6364.t, 1, mean, na.rm=T) 
+df6364 = cbind(df6364.n, df6364.t)
+df6364$mean.T <- df6364.t.mean
+df6364$mean.N <- df6364.n.mean
+pv.df6364 <- apply(df6364, 1, func.list$studentT, 
+    s1=c(as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])),
+    s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])))
+df6364$p.value <- as.numeric(pv.df6364)
+df6364$FC <- df6364$mean.T - df6364$mean.N
+### Plotting
+plotVolcano(df6364,
+    title = "Volcano Plot, Endometriosis vs Normal (GSE6364)",
+    filename = 'gse6364.volcano.svg'
+    )
+gse6364.hv <- plotHeatmap(df6364, gse6364.s, color.map.gse6364.type,
+    title = 'GSE6364',
+    filename = 'gse6364.heatmap.svg'
+    )
+gse6364.hvb <- plotBildDirectionality(df6364, gse6364.s, color.map.gse6364.type,
+    title = 'GSE6364 Bild Sorted',
+    filename = 'gse6364.bild.sorted.svg'
+    )
 
 ## Preprocessing GSE5108
 df5108 <- as.matrix(gse5108.src[,as.character(gse5108.s.sort[,1])])
