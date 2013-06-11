@@ -557,7 +557,7 @@ plotVolcano <- function(df, filename='volcano.svg',
     dev.off()
 } 
 plotHeatmap <-
-function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=hgu133plus2SYMBOL) {
+function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=NA) {
     svg(filename=filename)
     #colnames I always want removed:
     filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
@@ -565,8 +565,11 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=h
     filterout <-
     -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
     filtered = df[,filterout]
-    labRow=srcGeneLookup(rownames(df)),
-    labRow=unlist(mget(rownames(df), probemap), use.names=F),
+    if (is.na(probemap)){
+        labRow <- srcGeneLookup(rownames(df))
+    } else {
+        labRow <- unlist(mget(rownames(df), probemap), use.names=F)
+    }
     hv <- heatmap.plus(
         as.matrix(filtered), # PLOTS ONLY THE SAMPLE COLUMNS
         na.rm=TRUE,
@@ -593,9 +596,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=h
             dim(filtered)[2],
             "Samples"
             ),
-        #labCol=NA
-        #labRow=srcGeneLookup(rownames(df)),
-        labRow=unlist(mget(rownames(df), probemap), use.names=F),
+        labRow=labRow,
         margin = c(10,10)
     )
     dev.off()
