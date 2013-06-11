@@ -380,6 +380,7 @@ srcGeneLookup <- function(affyP) {
     indices <- unlist(lapply(david.src$affyProbe, match, affyP), use.names=F)
     genes <- (david.src$GeneSymbol[indices])
     genes[is.na(genes)] <- 'unknown'
+    return(genes)
 }   
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -565,10 +566,12 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=N
     filterout <-
     -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
     filtered = df[,filterout]
-    if (is.na(probemap)){
+    if ( is.na(probemap) | missing(probemap) ){
         labRow <- srcGeneLookup(rownames(df))
+        RowSideColors <- build.side.map(df)
     } else {
         labRow <- unlist(mget(rownames(df), probemap), use.names=F)
+        RowSideColors <- build.side.map.plus(df, probemap)
     }
     hv <- heatmap.plus(
         as.matrix(filtered), # PLOTS ONLY THE SAMPLE COLUMNS
@@ -576,7 +579,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=N
         scale="none",
         #scale="row",
         ColSideColors=build.top.map(df, df.s, colormap),
-        RowSideColors=build.side.map.plus(df, probemap), # most differentially expressed genes
+        RowSideColors=RowSideColors, 
         col=jet.colors(75),
         key=FALSE,
         #key=T, 
@@ -719,30 +722,31 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
 #tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
 
 ### Preprocessing GSE7305
-tttt <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
-#tttt <- tttt[-4,]  #"1556499_s_ati probe" an outlier that skews the coloring!
-tttt <- tttt[-which(rownames(tttt) == "1556499_s_at"),] 
-tttt <- as.data.frame(tttt);
-tttt <- log2(tttt);
-tttt.n <- apply(tttt[,1:10], 1, mean, na.rm=T); 
-tttt$mean.N <- tttt.n
-tttt.t <- apply(tttt[,11:20], 1, mean, na.rm=T); 
-tttt$mean.T <- tttt.t
-pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
-tttt$p.value <- as.numeric(pv)
-tttt$FC <- tttt$mean.T - tttt$mean.N
+df7305 <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
+#df7305 <- df7305[-4,]  #"1556499_s_ati probe" an outlier that skews the coloring!
+df7305 <- df7305[-which(rownames(df7305) == "1556499_s_at"),] 
+df7305 <- as.data.frame(df7305);
+df7305 <- log2(df7305);
+df7305.n <- apply(df7305[,1:10], 1, mean, na.rm=T); 
+df7305$mean.N <- df7305.n
+df7305.t <- apply(df7305[,11:20], 1, mean, na.rm=T); 
+df7305$mean.T <- df7305.t
+pv <- apply(df7305, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
+df7305$p.value <- as.numeric(pv)
+df7305$FC <- df7305$mean.T - df7305$mean.N
 
 #### Plotting
-plotVolcano(tttt,
+plotVolcano(df7305,
     title="Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
     filename='gse7305.volcano.svg'
     #filename='gse7305.volcano.png'
     )
-#gse7305.hv <- plotHeatmap(tttt, gse7305.s, color.map.gse7305.type,
-#    title = 'GSE7305',
-#    filename = 'gse7305.heatmap.svg'
-#    )
-#gse7305.hvb <- plotBildDirectionality(tttt, gse7305.s, color.map.gse7305.type,
+gse7305.hv <- plotHeatmap(df7305, gse7305.s, 
+    colormap=color.map.gse7305.type,
+    title = 'GSE7305',
+    filename = 'gse7305.heatmap.svg'
+    )
+#gse7305.hvb <- plotBildDirectionality(df7305, gse7305.s, color.map.gse7305.type,
 #    title = 'GSE7305 Bild Sorted',
 #    filename = 'gse7305.bild.sorted.svg'
 #    )
