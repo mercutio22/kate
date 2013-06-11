@@ -368,15 +368,19 @@ removeColumns <- function(df) {
 #    return(colors)
 #}
 
-srcGeneLookup <- function(probes) {
-    return(
-        as.character(unlist(
-            lapply(probes, func.list$vlookup, david.src, 'GeneSymbol')
-            )
-        )
-    )
-}
-
+#srcGeneLookup <- function(probes) {
+#    return(
+#        as.character(unlist(
+#            lapply(probes, func.list$vlookup, david.src, 'GeneSymbol')
+#            )
+#        )
+#    )
+#}
+srcGeneLookup <- function(affyP) {
+    indices <- unlist(lapply(david.src$affyProbe, match, affyP), use.names=F)
+    genes <- (david.src$GeneSymbol[indices])
+    genes[is.na(genes)] <- 'unknown'
+}   
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### make volcano plot plus
@@ -487,11 +491,11 @@ function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1,
                 -log10(p[text]), 
                 #labels=probes,
                 #My hack for labeling kate's data according to gene symbols
-                #labels=srcGeneLookup(probes),
-                labels=unlist(
-                    mget(probes, probemap, ifnotfound=NA), 
-                    use.names=F
-                    ),
+                labels=srcGeneLookup(probes),
+#                labels=unlist(
+#                    mget(probes, probemap, ifnotfound=NA), 
+#                    use.names=F
+#                    ),
                 cex=0.5,
                 srt=angle,
                 offset=0.25,
@@ -535,8 +539,8 @@ plotVolcano <- function(df, filename='volcano.svg',
     title='Volcano Plot', 
     probemap=hgu133plus2SYMBOL) {
     #custom volcano plot customized for kate's analysis
-    #svg(filename=filename)
-    png(filename=filename)
+    svg(filename=filename)
+#    png(filename=filename)
     volcano.plus(df, 
         fold.change.col = "FC", 
         pv.col = "p.value", 
@@ -561,6 +565,8 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=h
     filterout <-
     -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
     filtered = df[,filterout]
+    labRow=srcGeneLookup(rownames(df)),
+    labRow=unlist(mget(rownames(df), probemap), use.names=F),
     hv <- heatmap.plus(
         as.matrix(filtered), # PLOTS ONLY THE SAMPLE COLUMNS
         na.rm=TRUE,
@@ -589,7 +595,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=h
             ),
         #labCol=NA
         #labRow=srcGeneLookup(rownames(df)),
-        labRow=unlist(mget(rownames(df5108), probemap), use.names=F),
+        labRow=unlist(mget(rownames(df), probemap), use.names=F),
         margin = c(10,10)
     )
     dev.off()
@@ -646,7 +652,6 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
 #cc.col.merged <- rbind(cc.col.t, cc.col.gse6008)
 #colnames(cc.col.merged) = c("Tothill & GSE6008","Tothill & GSE6008")
 #cc.col.merged <- cbind(cc.col.merged, cc.col.merged)
-
 #png(filename = "tothill.src.png", bg="white", res=300, width=3000, height=3000)
 #tothill.hv<-heatmap.plus(
 #		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
@@ -712,25 +717,26 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
 #this table compares our analysis with Bilds's
 #tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
 
-#### Preprocessing GSE7305
-#tttt <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
-##tttt <- tttt[-4,]  #"1556499_s_ati probe" an outlier that skews the coloring!
-#tttt <- tttt[-which(rownames(tttt) == "1556499_s_at"),] 
-#tttt <- as.data.frame(tttt);
-#tttt <- log2(tttt);
-#tttt.n <- apply(tttt[,1:10], 1, mean, na.rm=T); 
-#tttt$mean.N <- tttt.n
-#tttt.t <- apply(tttt[,11:20], 1, mean, na.rm=T); 
-#tttt$mean.T <- tttt.t
-#pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
-#tttt$p.value <- as.numeric(pv)
-#tttt$FC <- tttt$mean.T - tttt$mean.N
-#
+### Preprocessing GSE7305
+tttt <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
+#tttt <- tttt[-4,]  #"1556499_s_ati probe" an outlier that skews the coloring!
+tttt <- tttt[-which(rownames(tttt) == "1556499_s_at"),] 
+tttt <- as.data.frame(tttt);
+tttt <- log2(tttt);
+tttt.n <- apply(tttt[,1:10], 1, mean, na.rm=T); 
+tttt$mean.N <- tttt.n
+tttt.t <- apply(tttt[,11:20], 1, mean, na.rm=T); 
+tttt$mean.T <- tttt.t
+pv <- apply(tttt, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
+tttt$p.value <- as.numeric(pv)
+tttt$FC <- tttt$mean.T - tttt$mean.N
+
 #### Plotting
-#plotVolcano(tttt,
-#    title="Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
-#    filename='gse7305.volcano.svg'
-#    )
+plotVolcano(tttt,
+    title="Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
+    filename='gse7305.volcano.svg'
+    #filename='gse7305.volcano.png'
+    )
 #gse7305.hv <- plotHeatmap(tttt, gse7305.s, color.map.gse7305.type,
 #    title = 'GSE7305',
 #    filename = 'gse7305.heatmap.svg'
@@ -810,8 +816,8 @@ df5108$FC <- df5108$mean.T - df5108$mean.N
 #plotting
 plotVolcano(df5108,
     title='GSE5108 SRC genes: Endometriosis vs eutopic endometrium',
-    #filename='gse5108.volcano.svg'
-    filename='gse5108.volcano.png'
+    filename='gse5108.volcano.svg'
+#    filename='gse5108.volcano.png'
     )
 gse5108.hv <- plotHeatmap(df5108, gse5108.s, color.map.gse5108.type, 
     probemap=hwgcodSYMBOL,
