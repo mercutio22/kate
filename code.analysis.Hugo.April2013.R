@@ -8,9 +8,34 @@ library(plyr)
 library("hgu133plus2.db") # Affymetrix Human Genome U133 Plus 2.0 Array annotation data
 library("hwgcod.db") # GE/Amersham Codelink Human Whole Genome Bioarray 
 library("hgug4112a.db") # 
-options(stringsAsFactors=FALSE)
+#options(stringsAsFactors=FALSE)
+##TODO - get more datasets
 
-###tothill data
+## ovarian cancer tissue from ascites-cytology-positive or -negative patients
+## log2 GC-RMA signal
+gse39204 <- getGEO("GSE39204") 
+gse39204.d <- exprs(gse39204$GSE39204_series_matrix.txt.gz)
+gse39204.s <- phenoData(gse39204$GSE39204_series_matrix.txt.gz)@data
+
+## 38 ovarian cancer cell lines (13 OCCC cell lines and 25 non-OCCC cell lines
+## log 2 values of RMA signal intensity
+gse29175 <- getGEO("GSE29175") 
+gse29175.d <- exprs(gse29175$GSE29175_series_matrix.txt.gz)
+gse29175.s <- phenoData(gse29175$GSE29175_series_matrix.txt.gz)@data
+
+## 10 clear cell ovarian cancer specimens and 10 normal ovarian surface epithelium
+## log2 RMA signal 
+gse29450 <- getGEO("GSE29450") 
+gse29450.d <- exprs(gse29450$GSE29450_series_matrix.txt.gz)
+gse29450.s <- phenoData(gse29450$GSE29450_series_matrix.txt.gz)@data
+
+## 58 stage III-IV ovarian cancer patients treated with Carboplatin and Taxol agents
+## log2 signal processed by RMA
+gse30161 <- getGEO("GSE30161") 
+gse30161.d <- exprs(gse30161$GSE30161_series_matrix.txt.gz)
+gse30161.s <- phenoData(gse30161$GSE30161_series_matrix.txt.gz)@data
+
+###tothill data (Endometriosis and Ovarian cancer - no normals.)
 #tothill <- getGEO("GSE9891")
 #tothill.d1 <- exprs(tothill$`GSE9891_series_matrix-1.txt.gz`)
 #tothill.d2 <- exprs(tothill$`GSE9891_series_matrix-2.txt.gz`)
@@ -43,8 +68,6 @@ options(stringsAsFactors=FALSE)
 #gse7307.endo.normal <- (subset(sample.info.gse7307, Tissue.Cell.Line..C.=="endometrium"))
 #gse7307.s <- rbind(gse7307.disease, gse7307.endo.normal)
 #
-##TODO - get more datasets
-##GSE23339
 #
 ##GSE37837 # NOT NORMALIZED apparently
 #gse37837 <- getGEO('GSE37837')
@@ -103,6 +126,10 @@ options(stringsAsFactors=FALSE)
 #gse23339.s <- phenoData(gse23339$GSE23339_series_matrix.txt.gz)@data
 #
 #save(
+#    gse29450.d,
+#    gse29450.s,
+#    gse30161.d, 
+#    gse30161.s. 
 #    gse6364.d, 
 #    gse6364.s, 
 #    gse7307.d, 
@@ -147,15 +174,11 @@ Src.signature$direction[Src.signature$logFC>0] <- c("UP.BILD")
 #indices <- match(david.src$affyProbe, Src.signature$ProbeID)
 
 #update Src.signature with updated gene symbols from the bioconductor bimap
-
 Src.signature$GeneSymbol <- unlist(
     mget(Src.signature$ProbeID, hgu133plus2SYMBOL, ifnotfound=NA), 
     use.names=F)
 rename <- with(Src.signature, which(is.na(GeneSymbol)))
-Src.signature$GeneSymbol[rename] <- '---'
-
 src = Src.signature #some of houtan's code reference this variable name
-
 # used to subset Codelink probeIDs:
 tmp <- unlist(
     mget(unique(Src.signature$GeneSymbol), hwgcodALIAS2PROBE, ifnotfound=NA),
@@ -667,6 +690,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=N
 #reorder columns accordind to the manifest
 dfTothill <- tothill.src[,tothill.s.sort$geo_accession]
 #TODO: remove COL1A1? 
+dfTothill <- dfTothill[-which(rownames(dfTothill) == "1556499_s_at"),]
 #dfTothill <- log2(dfTothill)
 endometriosis <- which(str_detect(tothill.s.sort$characteristics_ch1a, 'Endo')) 
 otherovarian <- which(!str_detect(tothill.s.sort$characteristics_ch1a, 'Endo'))
@@ -694,7 +718,7 @@ dfTothill.hvb <- plotBildDirectionality(dfTothill, tothill.s, color.map.tothill.
     
 ### Processing GSE7305
 df7305 <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
-#df7305 <- df7305[-4,]  #"1556499_s_ati probe" an outlier that skews the coloring! Gene COL1A1
+#df7305 <- df7305[-4,]  #"1556499_s_at probe" an outlier that skews the coloring! Gene COL1A1
 df7305 <- df7305[-which(rownames(df7305) == "1556499_s_at"),] 
 df7305 <- as.data.frame(df7305);
 df7305 <- log2(df7305);
