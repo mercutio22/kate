@@ -44,8 +44,13 @@ options(stringsAsFactors=FALSE)
 #gse7307.s <- rbind(gse7307.disease, gse7307.endo.normal)
 #
 ##TODO - get more datasets
-##GSE37837
 ##GSE23339
+#
+##GSE37837 # NOT NORMALIZED apparently
+#gse37837 <- getGEO('GSE37837')
+#gse37837.d <- as.data.frame(exprs(gse37837[[1]]))
+#gse37837.s <- phenoData(gse37837$GSE37837_series_matrix.txt.gz)@data
+#
 #
 ##GSE5108 
 ## already normalized (Why kate says otherwise on spreadsheet?)
@@ -57,12 +62,11 @@ options(stringsAsFactors=FALSE)
 ## We may stratify different cancer grades latter.
 #gse5108 = getGEO('GSE5108')
 #gse5108.d = as.data.frame(exprs(gse5108[[1]]))
-#gse5108.s = phenoData(gse5108$GSE5108_series_matrix.txt.gz)@data #Holy Cow, 11 sample kinds.
+#gse5108.s = phenoData(gse5108$GSE5108_series_matrix.txt.gz)@data 
 # all(dimnames(gse5108.s)[[1]] == names(gse5108.d))
 #
 #dataframe <- NULL
 #for(i in 1:length(gse7307.s$Sample)){
-#	
 #	if(is.null(dataframe)){
 #		test <- getGEO(as.character(gse7307.s[i,1]))
 #		dataframe <- Table(test)
@@ -70,7 +74,6 @@ options(stringsAsFactors=FALSE)
 #		dimnames(dataframe)[[2]] <- c("ID_REF",as.character(gse7307.s[i,1]))
 #		#print("Entrou IF") #Debug
 #	}
-#	
 #	else{
 #		test <- getGEO(as.character(gse7307.s[i,1]))
 #		test.d <- Table(test)
@@ -79,7 +82,6 @@ options(stringsAsFactors=FALSE)
 #		dataframe = merge(dataframe, test.d, by.x="ID_REF", by.y="ID_REF")
 #		#print("ELSE") #Debug
 #	}
-#
 #	#Progresso
 #	print(i)
 #	#print(files[i])
@@ -100,7 +102,6 @@ options(stringsAsFactors=FALSE)
 #gse23339.d <- (exprs(gse23339$GSE23339_series_matrix.txt.gz))
 #gse23339.s <- phenoData(gse23339$GSE23339_series_matrix.txt.gz)@data
 #
-#
 #save(
 #    gse6364.d, 
 #    gse6364.s, 
@@ -116,9 +117,10 @@ options(stringsAsFactors=FALSE)
 #    gse5108.d, 
 #    gse23339.s,
 #    gse23339.d,
+#    gse37837.s,
+#    gse37837.d,
 #    file="GEOfiles_associated_withENDO.downloaded.April2013.rda"
 #    )
-
 ####start from here#####
 setwd("/data/htorres/kate")
 load(file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
@@ -136,27 +138,34 @@ Src.signature$direction[Src.signature$logFC>0] <- c("UP.BILD")
 
 # src Gene signature file 
 # obtained by conveting affy probe names of each platform with DAVID (http://david.abcc.ncifcrf.gov/)
-david.src = read.table('David.Src.txt', header=T) #maybe I should use the corresponding R/BioC Annotation package for consistency
-david.src$To=toupper(as.character(david.src$To))
-colnames(david.src) <- c('affyProbe', 'GeneSymbol')
+#david.src = read.table('David.Src.txt', header=T) #maybe I should use the corresponding R/BioC Annotation package for consistency
+#david.src$To=toupper(as.character(david.src$To))
+#k <- c('PTHLH', 'ZNF12', 'SRC', 'PMS2L3', 'IRS1')
+#colnames(david.src) <- c('affyProbe', 'GeneSymbol')
 # getting illumina IDs:
 # davidIllumina <- read.table('david_affy_illumina.txt', header=T, sep='\t') #submitted david.src$From to DAVID conversion tool and got Illumina IDs 
-#update Src.signature with updated gene symbols
-indices = match(david.src$affyProbe, Src.signature$ProbeID)
-Src.signature$GeneSymbol[indices] <- david.src$GeneSymbol 
-## confirming this with a bimap ###
-## unlist(mget(Src.signature$ProbeID, hgu133plus2SYMBOL), use.names=F)
-## Mostly agrees.
+#indices <- match(david.src$affyProbe, Src.signature$ProbeID)
+
+#update Src.signature with updated gene symbols from the bioconductor bimap
+
+Src.signature$GeneSymbol <- unlist(
+    mget(Src.signature$ProbeID, hgu133plus2SYMBOL, ifnotfound=NA), 
+    use.names=F)
+rename <- with(Src.signature, which(is.na(GeneSymbol)))
+Src.signature$GeneSymbol[rename] <- '---'
+
 src = Src.signature #some of houtan's code reference this variable name
 
 # used to subset Codelink probeIDs:
 tmp <- unlist(
-    mget(david.src$GeneSymbol, revmap(hwgcodSYMBOL), ifnotfound=NA),
-    use.names=F
-    )
-codelinkSrc <- unique(tmp[!is.na(tmp)]) # GE/Amersham probe IDs corresponding to affy U133 v2.0
+    mget(unique(Src.signature$GeneSymbol), hwgcodALIAS2PROBE, ifnotfound=NA),
+    use.names=F)
+codelinkSrc <- unique(tmp[!is.na(tmp)]) #Src.signature GE/Amersham probe IDs 
 rm(tmp)
-
+#used to subset agilent 4112 probe IDs
+ag44112aSrc <- unlist(
+    mget(unique(Src.signature$GeneSymbol), hgug4112aALIAS2PROBE, ifnotfound=NA),
+    use.names=F)
 ##get probe specific to SRC signature
 gse6008.src.probe <- intersect(src[,1], dimnames(gse6008.d)[[1]])
 tothill.src.probe <- intersect(src[,1], dimnames(tothill.d)[[1]])
@@ -166,16 +175,17 @@ gse6364.src.probe <- intersect(src[,1], dimnames(gse6364.d)[[1]])
 ##The probenames should be prefixed by 'GE' but for some reason its not. WARNING! Verify why.
 rownames(gse5108.d) <- paste("GE",  rownames(gse5108.d), sep='') 
 gse5108.src.probe <- intersect(codelinkSrc, dimnames(gse5108.d)[[1]])
-#
+gse37837.src.probe <- intersect(ag44112aSrc, rownames(gse37837.d))
+
 ##subset data to only SRC specific and create dataframe. 
 tothill.src <- tothill.d[tothill.src.probe,]; tothill.src <- as.data.frame(tothill.src)
 gse6008.src <- gse6008.d[gse6008.src.probe,]; gse6008.src <- as.data.frame(gse6008.src)
 gse6364.src <- gse6364.d[gse6364.src.probe,]; gse6364.src <- as.data.frame(gse6364.src)
 gse7307.src <- gse7307.d[gse7307.src.probe,]; gse7307.src <- as.data.frame(gse7307.src)
 gse7305.src <- gse7305.d[gse7305.src.probe,]; gse7305.src <- as.data.frame(gse7305.src)
+## TODO insert rows of NAs in place of the missing Src signature genes
 gse5108.src <- as.data.frame(gse5108.d[gse5108.src.probe,])
-
-
+gse37837.src <- as.data.frame(gse37837.d[gse37837.src.probe,])
 #WHat does this do? clueless..
 sort.data.frame <- function(x, key, ...) {
 	if (missing(key)) {
@@ -188,27 +198,24 @@ sort.data.frame <- function(x, key, ...) {
 }
 
 ###cleanup sample manifest #metadata) # WARNING: I Don't understand this section
-tothill.nn <- strsplit(as.character(tothill.s$characteristics_ch1), " : ")
-tothill.nnn <- as.data.frame(as.character(unlist(lapply((tothill.nn), "[", 2) )))
-tothill.s$characteristics_ch1a <- tothill.nnn[,1]
-
+#further code expects every manifest dataframe (df.s) to contain a characteristics_ch1a column
+#tothill.nn <- strsplit(as.character(tothill.s$characteristics_ch1), " : ")
+#tothill.nnn <- as.data.frame(as.character(unlist(lapply((tothill.nn), "[", 2) )))
+#tothill.s$characteristics_ch1a <- tothill.nnn[,1]
+tothill.s$characteristics_ch1a <- tothill.s$characteristics_ch1.2
 gse6008.nn <- strsplit(as.character(gse6008.s$characteristics_ch1), ": ")
 gse6008.nnn <- as.data.frame(as.character(unlist(lapply((gse6008.nn), "[", 2) )))
 gse6008.s$characteristics_ch1a <- gse6008.nnn[,1]
-
-#further code expects every manifest dataframe (df.s) to contain a characteristics_ch1 column
-gse6364.s$characteristics_ch1a <- gse6364.s$characteristics_ch1
-
 ### endometrium is normal & endometrium/ovary is diseased
 gse7307.s$characteristics_ch1a <- gse7307.s$Tissue.Cell.Line..C. 
-
 gse7305.nn <- strsplit(as.character(gse7305.s$characteristics_ch1), " ")
 gse7305.nnn <- as.data.frame(as.character(unlist(lapply((gse7305.nn), "[", 1) )))
 gse7305.s$characteristics_ch1a <- gse7305.nnn[,1]
-
 gse5108.s$characteristics_ch1a <- gse5108.s$characteristics_ch1
+gse6364.s$characteristics_ch1a <- gse6364.s$characteristics_ch1
+gse37837.s$characteristics_ch1a <- gse37837.s$characteristics_ch1.2
 
-## why do we need to do this? 
+#Sort the metadataframes:
 tothill.s.sort <- sort.data.frame(tothill.s[,c("geo_accession","characteristics_ch1a")], 
 	key = "characteristics_ch1a")
 gse6008.s.sort <- sort.data.frame(gse6008.s[,c("geo_accession","characteristics_ch1a")], 
@@ -221,14 +228,27 @@ gse7305.s.sort <- sort.data.frame(gse7305.s[,c("geo_accession","characteristics_
 	key = "characteristics_ch1a")
 gse5108.s.sort <- sort.data.frame(gse5108.s[,c("geo_accession","characteristics_ch1")], 
 	key = "characteristics_ch1")
+gse37837.s.sort <- sort.data.frame(gse37837.s[,c("geo_accession", "characteristics_ch1a")],
+    key= "characteristics_ch1a")
 
-## ColSideColors
-color.map.tothill.type <- function(mol.biol) {
+## ColSideColors - red is cancer, grey is normal
+color.map.gse37837.type <- function(mol.biol) {
+    if ( str_detect(mol.biol, 'ectopic') ) "red"
+    else if ( str_detect(mol.biol, 'eutopic') ) "#9C897E" #grey
+    else "#FFFFFF" #white
+}
+color.map.tothill.type.houtan <- function(mol.biol) {
 	if (mol.biol=="Fallopian") "green" #green
 	else if (mol.biol=="Ovary") "#red" #red
 	else if (mol.biol=="Peritoneum") "black"
 	else "#FFFFFF" #white
 } #
+color.map.tothill.type <- function(mol.biol) {
+    if (str_detect(mol.biol, 'Endo')) 'red'
+    else if (str_detect(mol.biol, 'Ser')) '#CB4B16' #orangy
+    else if (str_detect(mol.biol, 'Adeno')) '#B58900' #Yellowy
+    else "#FFFFFF"
+}
 color.map.gse6008.type <- function(mol.biol) {
 	if (mol.biol=="Clear_Cell") "green" #green
 	else if (mol.biol=="Endometrioid") "red" #red
@@ -261,20 +281,18 @@ color.map.gse5108.type <- function(mol.biol) {
     else if (str_detect(mol.biol, 'eutopic endometrium')) "#9C897E" #grey
     else '#FFFFFF'
 }
-
-#rowsidecolors 
+#rowsidecolors - red is upregulated, green is downregulated
 bildColors.colorize <- function(abbrv){ 
-	if (abbrv == 'UP.BILD') 'red'
+    if ( is.na(abbrv) ) '#FFFFFF' # missing
+	else if (abbrv == 'UP.BILD') 'red'
 	else if (abbrv == 'DN.BILD') 'green'
 	else '#FFFFFF' #insignificant cases 
 } 
-
 klColors.colorize = function(abbrv){
 	if (abbrv == 'UP.KL') {return('red')}
 	else if (abbrv == 'DN.KL') {return('green')}
 	else return('#FFFFFF') #insignificant cases
 }
-
 build.side.map = function(df){
 	### takes dataframe, merges with the Src signature and creates RowSideColors for our plots
 	## df is the full dataframe, with FC and P values
@@ -297,15 +315,15 @@ build.side.map = function(df){
 }
 
 build.side.map.plus <- function(df, probemap=hgu133plus2GENENAME) {
-	### takes dataframe, merges with the david.src signature and creates RowSideColors for our plots
-	## df is the Bild SRC subsetted GSE dataframe, with samples, FC, mean.T, mean.N and p.value
-    ## probe2geneSymbol.db is a biocondutor "bimap" annotation object such as hgu133plus2GENENAME 
+	### takes dataframe, merges with the david.src signature and creates RowSideColors
+	## df: the Bild SRC subsetted GSE dataframe, with samples, FC, mean.T, mean.N and p.value
+    ## probe2geneSymbol.db is a biocondutor "bimap" annotation object 
     df$probeID <- rownames(df)
     df$GeneSymbol <- unlist( mget(df$probeID, probemap, ifnotfound=NA), use.names=F )
-    #having the geneSymbol, lookup whats the gene expression directionality in the Src.signature
+    #having the geneSymbol, get the gene expression directionality in the Src.signature
     indices <- match(df$GeneSymbol, Src.signature$GeneSymbol)
     df$direction <- Src.signature$direction[indices]
-    df$direction[is.na(df$direction)] <- 'unknown' #DAVID makes ZN12 disappear! DISCUSS with Houtan how we should proceed.
+    df$direction[is.na(df$direction)] <- 'unknown' 
     df$Ldirection <- NA
     df$Ldirection[df$FC > 0] <- c('DN.KL')
 	df$Ldirection[df$FC>0] <- c("UP.KL")
@@ -358,20 +376,10 @@ removeColumns <- function(df) {
     return(df)
 }
 
-#build.top.map.plus <- function(df, df.s.sort, df.colormap.function) {
-#    df <- removeColumns(df)    
-#    colors <- unlist(lapply(df.s.sort$characteristics_ch1a, df.colormap.function)) 
-#	ColSideColors = matrix(as.character(c(colors)), 
-#			nrow = length(colors),
-#			ncol = 1)
-#    colors <- cbind(ColSideColors, ColSideColors)
-#    return(colors)
-#}
-
 srcGeneLookup <- function(probes) {
     return(
         as.character(unlist(
-            lapply(probes, func.list$vlookup, david.src, 'GeneSymbol')
+            lapply(probes, func.list$vlookup, Src.signature, 'GeneSymbol')
             )
         )
     )
@@ -391,10 +399,8 @@ function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1,
     fold.cut2, pv.adj.col,ncolors=1, text=NA, angle=-45, probemap=NA) {
     #text <-- a logical vector used to subset x    
     #cut.line <-- p.value cutoff line (not log10 transformed)
-
     op <- par(no.readonly = TRUE)
     p<-x[,pv.col]
-
     if (all(is.na(p))==FALSE) {
         M<-x[,fold.change.col]
         upr = p<=cut.line & M >=fold.cut1
@@ -483,17 +489,20 @@ function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1,
             abline(v= fold.cut2, lty=3, lwd=1, col="black")
         }
         if( !all(is.na(text)) ){
-            probes <- rownames(df)[text]
+            probes <- rownames(x)[text]
+            #print( c('probes', probes) )
             if (is.na(probemap) | missing(probemap) ) { 
-                labels <- srcGeneLookup(probes)
+                genelabels <- srcGeneLookup(probes)
             } else {
-                labels <- unlist(
+                genelabels <- unlist(
                     mget(probes, probemap, ifnotfound=NA), 
                     use.names=F)
             }
+            #print( c('probemap', probemap) )
+            #print( c('genelabels', genelabels) )
             text(M[text],
                 -log10(p[text]), 
-                labels=labels,
+                labels=genelabels,
                 cex=0.5,
                 srt=angle,
                 offset=0.25,
@@ -533,9 +542,10 @@ function(x,fold.change.col,pv.col, title.plot, cut.line, fold.cut1,
     }   
     par(op)
 }
-plotVolcano <- function(df, filename='volcano.svg', 
+plotVolcano <- function(df, 
+    filename='volcano.svg', 
     title='Volcano Plot', 
-    probemap=hgu133plus2SYMBOL) {
+    probemap=NA) {
     #custom volcano plot customized for kate's analysis
     svg(filename=filename)
 #    png(filename=filename)
@@ -550,7 +560,8 @@ plotVolcano <- function(df, filename='volcano.svg',
         ncolors = 5,
         #text = (df$FC < -0.5 | df$FC > 0.5) & -log10(df$p.value) > -log10(0.05),
         text = -log10(df$p.value) > -log10(0.05),
-        angle = 45
+        angle = 45,
+        probemap = probemap
         ) 
     dev.off()
 } 
@@ -603,7 +614,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=N
     return(hv)
 }
 plotBildDirectionality <-
-function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
+function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=NA) {
     #Produces a heatmap sorted according to Bild Directionality
     bildExpDir <- build.side.map(df)[,1] # Bild et al. expression directionality
     up <- which(bildExpDir == 'red')
@@ -642,6 +653,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
             dim(filtered)[2],
             "Samples"
             ),
+        probemap=probemap,
         #labCol=NA
         labRow=srcGeneLookup(rownames(df)),
         margin = c(10,10)
@@ -650,77 +662,39 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap') {
     return(hv)
 }
 
-#cc.col.merged <- rbind(cc.col.t, cc.col.gse6008)
-#colnames(cc.col.merged) = c("Tothill & GSE6008","Tothill & GSE6008")
-#cc.col.merged <- cbind(cc.col.merged, cc.col.merged)
-#png(filename = "tothill.src.png", bg="white", res=300, width=3000, height=3000)
-#tothill.hv<-heatmap.plus(
-#		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
-#		#as.matrix(temp[,(as.character(cl.sort[,1]))]),
-#		as.matrix(tothill.src[,tothill.s.sort[,1]]), 
-#		#temp.cc,
-#		na.rm=TRUE,
-#		scale="none",
-#		#RowSideColor=probe.cc,
-#		ColSideColors=cc.col.t,
-#		col=jet.colors(75),
-#		#key=FALSE,
-#		symkey=FALSE,
-#		density.info="none",
-#		trace="none",
-#		Rowv=TRUE,
-#		Colv=NA,
-#		cexRow=1,
-#		cexCol=0.6,
-#		keysize=1,
-#		dendrogram=c("none"),
-#		main = paste("Tothill; SRC only (73 probes) ",
-#			dim(tothill.src)[1],
-#			"Probes; ",
-#			dim(tothill.src)[2],
-#			"Samples"
-#			),
-#		#labCol=NA
-#		labRow=NA
-#)
-#dev.off()
-#png(filename = "gse6008.src.png", bg="white", res=300, width=3000, height=3000)
-#gse6008.hv<-heatmap.plus(
-#		#as.matrix(temp[hv1[[1]],(as.character(cl.sort[,1]))]),
-#		#as.matrix(temp[,(as.character(cl.sort[,1]))]),
-#		as.matrix(gse6008.src[,gse6008.s.sort[,1]]), 
-#		#temp.cc,
-#		na.rm=TRUE,
-#		scale="none",
-#		#RowSideColor=probe.cc,
-#		ColSideColors=cc.col.gse6008,
-#		col=jet.colors(75),
-#		#key=FALSE,
-#		symkey=FALSE,
-#		density.info="none",
-#		trace="none",
-#		Rowv=TRUE,
-#		Colv=NA,
-#		cexRow=1,
-#		cexCol=0.6,
-#		keysize=1,
-#		dendrogram=c("none"),
-#		main = paste("gse6008; SRC only (73 probes) ",
-#			dim(gse6008.src)[1],"Probes; ",
-#			dim(gse6008.src)[2],
-#			"Samples"
-#			),
-#		#labCol=NA
-#		labRow=NA
-#		)
-#dev.off()
 
-#this table compares our analysis with Bilds's
-#tcomparison <- table(subset(src.sig, label == "Significant")$direction.y, subset(src.sig, label == "Significant")$direction.x)
-
-### Preprocessing GSE7305
+### Processing Tothill (GSE9891) data:
+#reorder columns accordind to the manifest
+dfTothill <- tothill.src[,tothill.s.sort$geo_accession]
+#TODO: remove COL1A1? 
+#dfTothill <- log2(dfTothill)
+endometriosis <- which(str_detect(tothill.s.sort$characteristics_ch1a, 'Endo')) 
+otherovarian <- which(!str_detect(tothill.s.sort$characteristics_ch1a, 'Endo'))
+dfTothill <- cbind.data.frame(dfTothill[,endometriosis], dfTothill[,otherovarian])
+dfTothill$mean.N <- apply(dfTothill[,endometriosis], 1, mean, na.rm=T)
+dfTothill$mean.T <- apply(dfTothill[,otherovarian], 1, mean, na.rm=T)
+dfTothill$p.value <-
+   apply(dfTothill, 1, func.list$studentT, s1=endometriosis, s2=otherovarian)
+dfTothill$FC <- with(dfTothill, mean.T - mean.N)
+#Plotting
+plotVolcano(dfTothill,
+    title="Volcano Plot, Endometriosis vs Other Ovarian Carcinomas (GSE9891)", 
+    filename='dfTothill.volcano.svg'
+    )
+dfTothill.hv <- plotHeatmap(dfTothill, tothill.s, 
+    colormap=color.map.tothill.type,
+    title = 'Tothill',
+    filename = 'dfTothill.heatmap.svg'
+    )
+dfTothill.hvb <- plotBildDirectionality(dfTothill, tothill.s, color.map.tothill.type,
+    title = 'Tothill Bild Sorted',
+    filename = 'dfTothill.bild.sorted.svg'
+    )
+    
+    
+### Processing GSE7305
 df7305 <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
-#df7305 <- df7305[-4,]  #"1556499_s_ati probe" an outlier that skews the coloring!
+#df7305 <- df7305[-4,]  #"1556499_s_ati probe" an outlier that skews the coloring! Gene COL1A1
 df7305 <- df7305[-which(rownames(df7305) == "1556499_s_at"),] 
 df7305 <- as.data.frame(df7305);
 df7305 <- log2(df7305);
@@ -731,7 +705,6 @@ df7305$mean.T <- df7305.t
 pv <- apply(df7305, 1, func.list$studentT, s1=c(1:10),s2=c(11:20))
 df7305$p.value <- as.numeric(pv)
 df7305$FC <- df7305$mean.T - df7305$mean.N
-
 #### Plotting
 plotVolcano(df7305,
     title="Volcano Plot, Endometrium/Ovary Disease vs Endometrium-Normal (GSE7305)", 
@@ -756,6 +729,7 @@ gse7307.norm <- as.character(subset(gse7307.s.sort,
 gse7307.tum <- as.character(subset(gse7307.s.sort, 
     characteristics_ch1a=="endometrium/ovary")$Sample)
 df7307 <- cbind.data.frame(df7307[gse7307.norm], df7307[gse7307.tum])
+df7307 <- log2(df7307) #previously only RMA normalized but not log2 transformed
 df7307$mean.N <- apply(df7307[,gse7307.norm], 1, mean, na.rm=T)
 df7307$mean.T <- apply(df7307[,gse7307.tum], 1, mean, na.rm=T)
 pv.7307 <- apply(df7307, 1, func.list$studentT, s1=c(gse7307.norm),s2=c(gse7307.tum))
@@ -775,7 +749,6 @@ gse7307.hvb <- plotBildDirectionality(df7307, gse7307.s, color.map.gse7307.type,
     filename = 'gse7307.bild.sorted.svg'
     )
 
-
 ### Preprocessing GSE6364
 df6364 <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
 df6364 <- df6364[-which(rownames(df6364) == "1556499_s_at"),] # outlier
@@ -792,7 +765,8 @@ df6364$mean.T <- df6364.t.mean
 df6364$mean.N <- df6364.n.mean
 pv.df6364 <- apply(df6364, 1, func.list$studentT, 
     s1=c(as.character(gse6364.s.sort[c(7:9,19:26,33:37),"geo_accession"])),
-    s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"])))
+    s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"]))
+)
 df6364$p.value <- as.numeric(pv.df6364)
 df6364$FC <- df6364$mean.T - df6364$mean.N
 ### Plotting
@@ -809,26 +783,60 @@ gse6364.hvb <- plotBildDirectionality(df6364, gse6364.s, color.map.gse6364.type,
     filename = 'gse6364.bild.sorted.svg'
     )
 
-## Preprocessing GSE5108
-df5108 <- as.matrix(gse5108.src[,as.character(gse5108.s.sort[,1])])
-df5108 <- as.data.frame(df5108) 
-ColNormals <- which(str_detect(gse5108.s.sort$characteristics_ch1, 'endometriosis')) 
-ColTumors <- which(str_detect(gse5108.s.sort$characteristics_ch1, 'eutopic endometrium')) 
-df5108 <- df5108[,c(ColNormals, ColTumors)]
-df5108$mean.T <- apply(df5108[,ColTumors], 1, mean, na.rm=T)
-df5108$mean.N <- apply(df5108[,ColNormals], 1, mean, na.rm=T)
-df5108$p.value <- as.numeric(
-    apply(df5108, 1, func.list$studentT, s1=ColNormals, s2=ColTumors)
-    )
-df5108$FC <- df5108$mean.T - df5108$mean.N
-#plotting
-plotVolcano(df5108,
-    title='GSE5108 SRC genes: Endometriosis vs eutopic endometrium',
-    filename='gse5108.volcano.svg'
-#    filename='gse5108.volcano.png'
-    )
-gse5108.hv <- plotHeatmap(df5108, gse5108.s, color.map.gse5108.type, 
-    probemap=hwgcodSYMBOL,
-    title='GSE5108',
-    filename='gse5108.heatmap.svg'
-    )
+###################################
+#### NON-AFFY U133 v2.0 DATASETS  #
+###################################
+
+### Processing GSE5108
+#df5108 <- as.matrix(gse5108.src[,as.character(gse5108.s.sort[,1])])
+#df5108 <- as.data.frame(df5108) 
+#ColNormals <- which(str_detect(gse5108.s.sort$characteristics_ch1, 'endometriosis')) 
+#ColTumors <- which(str_detect(gse5108.s.sort$characteristics_ch1, 'eutopic endometrium')) 
+#df5108 <- df5108[,c(ColNormals, ColTumors)]
+#df5108$mean.T <- apply(df5108[,ColTumors], 1, mean, na.rm=T)
+#df5108$mean.N <- apply(df5108[,ColNormals], 1, mean, na.rm=T)
+#df5108$p.value <- as.numeric(
+#    apply(df5108, 1, func.list$studentT, s1=ColNormals, s2=ColTumors)
+#    )
+#df5108$FC <- df5108$mean.T - df5108$mean.N
+##plotting
+#plotVolcano(df5108,
+#    title='GSE5108 SRC genes: Endometriosis vs eutopic endometrium',
+#    filename='gse5108.volcano.svg',
+#    probemap=hwgcodSYMBOL
+#    )
+#gse5108.hv <- plotHeatmap(df5108, gse5108.s, color.map.gse5108.type, 
+#    probemap=hwgcodSYMBOL,
+#    title='GSE5108',
+#    filename='gse5108.heatmap.svg'
+#    )
+#gse5108.hvb <- plotBildDirectionality(df5108, gse5108.s, color.map.gse5108.type,
+#    title = 'GSE5108 Bild Sorted',
+#    filename = 'gse5108.bild.sorted.svg',
+#    probemap = hwgcodSYMBOL
+#    )
+##TODO append probenames and GeneSymbols for each df
+### Processing GSE37837
+#df37837 <- gse37837.src[,gse37837.s.sort$geo_accession] 
+#ColNormals <- which(str_detect(gse37837.s.sort$characteristics_ch1a, 'eutopic'))
+#ColTumors <- which(str_detect(gse37837.s.sort$characteristics_ch1a, 'ectopic'))
+#df37837 <- df37837[,c(ColNormals,ColTumors)]
+#df37837$mean.T <- apply(df37837[,ColTumors], 1, mean, na.rm=T)
+#df37837$mean.N <- apply(df37837[,ColNormals], 1, mean, na.rm=T)
+#df37837$p.value <- as.numeric(
+#    apply(df37837, 1, func.list$studentT, s1=ColNormals, s2=ColTumors)
+#    )
+#df37837$FC <- df37837$mean.T - df37837$mean.N
+##plotting
+#plotVolcano(df37837,
+#    filename='gse37837.volcano.svg',
+#    title='GSE37837 SRC genes: Endometriosis vs eutopic endometrium',
+#    probemap=hgug4112aSYMBOL
+#    )
+#gse37837.hv <- plotHeatmap(df37837, gse37837.s, color.map.gse37837.type, 
+#    probemap=hgug4112aSYMBOL,
+#    title='GSE37837',
+#    filename='gse37837.heatmap.svg'
+#    )
+#endometriosis
+#endometriosis
