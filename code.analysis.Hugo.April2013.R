@@ -8,33 +8,33 @@ library(plyr)
 library("hgu133plus2.db") # Affymetrix Human Genome U133 Plus 2.0 Array annotation data
 library("hwgcod.db") # GE/Amersham Codelink Human Whole Genome Bioarray 
 library("hgug4112a.db") # 
-#options(stringsAsFactors=FALSE)
+options(stringsAsFactors=FALSE)
 ##TODO - get more datasets
 
 ## ovarian cancer tissue from ascites-cytology-positive or -negative patients
 ## log2 GC-RMA signal
-gse39204 <- getGEO("GSE39204") 
-gse39204.d <- exprs(gse39204$GSE39204_series_matrix.txt.gz)
-gse39204.s <- phenoData(gse39204$GSE39204_series_matrix.txt.gz)@data
-
+#gse39204 <- getGEO("GSE39204") 
+#gse39204.d <- exprs(gse39204$GSE39204_series_matrix.txt.gz)
+#gse39204.s <- phenoData(gse39204$GSE39204_series_matrix.txt.gz)@data
+#
 ## 38 ovarian cancer cell lines (13 OCCC cell lines and 25 non-OCCC cell lines
 ## log 2 values of RMA signal intensity
-gse29175 <- getGEO("GSE29175") 
-gse29175.d <- exprs(gse29175$GSE29175_series_matrix.txt.gz)
-gse29175.s <- phenoData(gse29175$GSE29175_series_matrix.txt.gz)@data
-
+#gse29175 <- getGEO("GSE29175") 
+#gse29175.d <- exprs(gse29175$GSE29175_series_matrix.txt.gz)
+#gse29175.s <- phenoData(gse29175$GSE29175_series_matrix.txt.gz)@data
+#
 ## 10 clear cell ovarian cancer specimens and 10 normal ovarian surface epithelium
 ## log2 RMA signal 
-gse29450 <- getGEO("GSE29450") 
-gse29450.d <- exprs(gse29450$GSE29450_series_matrix.txt.gz)
-gse29450.s <- phenoData(gse29450$GSE29450_series_matrix.txt.gz)@data
-
+#gse29450 <- getGEO("GSE29450") 
+#gse29450.d <- exprs(gse29450$GSE29450_series_matrix.txt.gz)
+#gse29450.s <- phenoData(gse29450$GSE29450_series_matrix.txt.gz)@data
+#
 ## 58 stage III-IV ovarian cancer patients treated with Carboplatin and Taxol agents
 ## log2 signal processed by RMA
-gse30161 <- getGEO("GSE30161") 
-gse30161.d <- exprs(gse30161$GSE30161_series_matrix.txt.gz)
-gse30161.s <- phenoData(gse30161$GSE30161_series_matrix.txt.gz)@data
-
+#gse30161 <- getGEO("GSE30161") 
+#gse30161.d <- exprs(gse30161$GSE30161_series_matrix.txt.gz)
+#gse30161.s <- phenoData(gse30161$GSE30161_series_matrix.txt.gz)@data
+#
 ###tothill data (Endometriosis and Ovarian cancer - no normals.)
 #tothill <- getGEO("GSE9891")
 #tothill.d1 <- exprs(tothill$`GSE9891_series_matrix-1.txt.gz`)
@@ -63,7 +63,7 @@ gse30161.s <- phenoData(gse30161$GSE30161_series_matrix.txt.gz)@data
 #all(dimnames(gse7305.s)[[1]]==names(gse7305.d))
 #
 ###GSE7307 - list of a variety of tumor/normal samples (need to select only relevant cases
-#sample.info.gse7307 <- read.delim(file="GSE7307_GEO_Sample_Info.csv")
+#sample.info.gse7307 <- read.delim(file="/data/htorres/kate/GSE7307_GEO_Sample_Info.csv")
 #gse7307.disease <- (subset(sample.info.gse7307, Disease.type!="Normal"))
 #gse7307.endo.normal <- (subset(sample.info.gse7307, Tissue.Cell.Line..C.=="endometrium"))
 #gse7307.s <- rbind(gse7307.disease, gse7307.endo.normal)
@@ -126,10 +126,14 @@ gse30161.s <- phenoData(gse30161$GSE30161_series_matrix.txt.gz)@data
 #gse23339.s <- phenoData(gse23339$GSE23339_series_matrix.txt.gz)@data
 #
 #save(
+#    gse29175.d,
+#    gse29175.s,
+#    gse39204.s,
+#    gse39204.d,
 #    gse29450.d,
 #    gse29450.s,
 #    gse30161.d, 
-#    gse30161.s. 
+#    gse30161.s,
 #    gse6364.d, 
 #    gse6364.s, 
 #    gse7307.d, 
@@ -178,6 +182,7 @@ Src.signature$GeneSymbol <- unlist(
     mget(Src.signature$ProbeID, hgu133plus2SYMBOL, ifnotfound=NA), 
     use.names=F)
 rename <- with(Src.signature, which(is.na(GeneSymbol)))
+Src.signature$GeneSymbol[rename] <- 'unknown'
 src = Src.signature #some of houtan's code reference this variable name
 # used to subset Codelink probeIDs:
 tmp <- unlist(
@@ -195,6 +200,11 @@ tothill.src.probe <- intersect(src[,1], dimnames(tothill.d)[[1]])
 gse7305.src.probe <- intersect(src[,1], dimnames(gse7305.d)[[1]])
 gse7307.src.probe <- intersect(src[,1], dimnames(gse7307.d)[[1]])
 gse6364.src.probe <- intersect(src[,1], dimnames(gse6364.d)[[1]])
+gse39204.src.probe <- intersect(src[,1], dimnames(gse39204.d)[[1]])
+gse29175.src.probe <- intersect(src[,1], dimnames(gse29175.d)[[1]])
+gse29450.src.probe <- intersect(src[,1], dimnames(gse29450.d)[[1]])
+gse30161.src.probe <- intersect(src[,1], dimnames(gse30161.d)[[1]])
+
 ##The probenames should be prefixed by 'GE' but for some reason its not. WARNING! Verify why.
 rownames(gse5108.d) <- paste("GE",  rownames(gse5108.d), sep='') 
 gse5108.src.probe <- intersect(codelinkSrc, dimnames(gse5108.d)[[1]])
@@ -206,10 +216,14 @@ gse6008.src <- gse6008.d[gse6008.src.probe,]; gse6008.src <- as.data.frame(gse60
 gse6364.src <- gse6364.d[gse6364.src.probe,]; gse6364.src <- as.data.frame(gse6364.src)
 gse7307.src <- gse7307.d[gse7307.src.probe,]; gse7307.src <- as.data.frame(gse7307.src)
 gse7305.src <- gse7305.d[gse7305.src.probe,]; gse7305.src <- as.data.frame(gse7305.src)
-## TODO insert rows of NAs in place of the missing Src signature genes
+gse39204.src <- gse39204.d[gse39204.src.probe,]; gse39204.src <- as.data.frame(gse39204.src)
+gse29175.src <- gse29175.d[gse29175.src.probe,]; gse29175.src <- as.data.frame(gse29175.src)
+gse29450.src <- gse29450.d[gse29450.src.probe,]; gse29450.src <- as.data.frame(gse29450.src)
+gse30161.src <- gse30161.d[gse30161.src.probe,]; gse30161.src <- as.data.frame(gse30161.src)
+## TODO insert rows of NAs in place of the missing Src signature genes (non-GPL570 platforms)
 gse5108.src <- as.data.frame(gse5108.d[gse5108.src.probe,])
 gse37837.src <- as.data.frame(gse37837.d[gse37837.src.probe,])
-#WHat does this do? clueless..
+
 sort.data.frame <- function(x, key, ...) {
 	if (missing(key)) {
 		rn <- rownames(x)
@@ -222,9 +236,6 @@ sort.data.frame <- function(x, key, ...) {
 
 ###cleanup sample manifest #metadata) # WARNING: I Don't understand this section
 #further code expects every manifest dataframe (df.s) to contain a characteristics_ch1a column
-#tothill.nn <- strsplit(as.character(tothill.s$characteristics_ch1), " : ")
-#tothill.nnn <- as.data.frame(as.character(unlist(lapply((tothill.nn), "[", 2) )))
-#tothill.s$characteristics_ch1a <- tothill.nnn[,1]
 tothill.s$characteristics_ch1a <- tothill.s$characteristics_ch1.2
 gse6008.nn <- strsplit(as.character(gse6008.s$characteristics_ch1), ": ")
 gse6008.nnn <- as.data.frame(as.character(unlist(lapply((gse6008.nn), "[", 2) )))
@@ -237,6 +248,10 @@ gse7305.s$characteristics_ch1a <- gse7305.nnn[,1]
 gse5108.s$characteristics_ch1a <- gse5108.s$characteristics_ch1
 gse6364.s$characteristics_ch1a <- gse6364.s$characteristics_ch1
 gse37837.s$characteristics_ch1a <- gse37837.s$characteristics_ch1.2
+gse39204.s <- within(gse39204.s, characteristics_ch1a <- characteristics_ch1.3) #Does the same thing.
+gse29175.s$characteristics_ch1a <- gse29175.s$characteristics_ch1.4
+gse29450.s$characteristics_ch1a <- gse29450.s$characteristics_ch1.1
+gse30161.s$characteristics_ch1a <- gse30161.s$characteristics_ch1.4
 
 #Sort the metadataframes:
 tothill.s.sort <- sort.data.frame(tothill.s[,c("geo_accession","characteristics_ch1a")], 
@@ -253,43 +268,76 @@ gse5108.s.sort <- sort.data.frame(gse5108.s[,c("geo_accession","characteristics_
 	key = "characteristics_ch1")
 gse37837.s.sort <- sort.data.frame(gse37837.s[,c("geo_accession", "characteristics_ch1a")],
     key= "characteristics_ch1a")
+gse39204.s.sort <- sort.data.frame(gse39204.s[,c("geo_accession","characteristics_ch1a")], 
+	key = "characteristics_ch1a")
+gse29175.s.sort <- sort.data.frame(gse29175.s[,c("geo_accession","characteristics_ch1a")], 
+	key = "characteristics_ch1a")
+gse29450.s.sort <- sort.data.frame(gse29450.s[,c("geo_accession","characteristics_ch1a")], 
+	key = "characteristics_ch1a")
+gse30161.s.sort <- sort.data.frame(gse30161.s[,c("geo_accession","characteristics_ch1a")], 
+	key = "characteristics_ch1a")
 
-## ColSideColors - red is cancer, grey is normal
+## ColSideColors - red is cancer, grey is normal, #CB4B16' #not endometrioid cancer
+color.map.gse29175.type <- function(mol.biol) {
+    if (str_detect(mol.biol, 'non-OCCC')) '#CB4B16' #different red for different kind of cancer
+    else if (mol.biol == 'histology: OCCC') '#red' #OCCC is considered endometriosis-derived cancer
+    else '#FFFFFF' #white
+}
+color.map.gse39204.type <- function(mol.biol) {
+    if ( str_detect(mol.biol, 'histology: clear') | 
+         str_detect(mol.biol, 'endometrioid') ) 'red'
+    else if ( str_detect(mol.biol, 'serous') | 
+              str_detect(mol.biol, 'mucinous') | 
+              str_detect(mol.biol, 'carcinoma') )'#CB4B16' #different kind of cancer 
+    else '#FFFFFF' #white
+    }
+color.map.gse29450.type <- function(mol.biol) {
+    if ( str_detect('clear cell ovarian cancer') ) 'red'
+    else if ( str_detect('normal') ) "#9C897E" #grey
+    else '#FFFFFF' #white
+    }
+color.map.gse30161.type <- function(mol.biol) {
+    if ( str_detect('Endometrioid') |
+         str_detect('Clear') ) 'red'
+    else if ( str_detect('Mucinous') |
+              str_detect('Serous') ) '#CB4B16' #different kind of cancer
+    else '#FFFFFF' # white
+    }
 color.map.gse37837.type <- function(mol.biol) {
     if ( str_detect(mol.biol, 'ectopic') ) "red"
     else if ( str_detect(mol.biol, 'eutopic') ) "#9C897E" #grey
     else "#FFFFFF" #white
-}
+    }
 color.map.tothill.type.houtan <- function(mol.biol) {
 	if (mol.biol=="Fallopian") "green" #green
 	else if (mol.biol=="Ovary") "#red" #red
 	else if (mol.biol=="Peritoneum") "black"
 	else "#FFFFFF" #white
-} #
+    } #
 color.map.tothill.type <- function(mol.biol) {
     if (str_detect(mol.biol, 'Endo')) 'red'
-    else if (str_detect(mol.biol, 'Ser')) '#CB4B16' #orangy
-    else if (str_detect(mol.biol, 'Adeno')) '#B58900' #Yellowy
+    else if ( str_detect(mol.biol, 'Ser') ) '#CB4B16' #orangy
+    else if ( str_detect(mol.biol, 'Adeno') ) '#B58900' #Yellowy
     else "#FFFFFF"
-}
+    }
 color.map.gse6008.type <- function(mol.biol) {
 	if (mol.biol=="Clear_Cell") "green" #green
 	else if (mol.biol=="Endometrioid") "red" #red
 	else if (mol.biol=="Mucinous") "black"
 	else if (mol.biol=="Serous") "yellow"
 	else "#FFFFFF"
-} #
+    } #
 color.map.gse7307.type <- function(mol.biol) {
 	if (mol.biol=="myometrium") "green" #green
 	else if (mol.biol=="endometrium/ovary") "red" 
 	else if (mol.biol=="endometrium") "#9C897E" #grey
 	else "#FFFFFF"
-} #
+    }       #
 color.map.gse7305.type <- function(mol.biol) {
 	if (mol.biol=="Endometrium/Ovary-Disease") "red" 
 	else if (mol.biol=="Endometrium-Normal") "#9C897E" #grey
 	else "#FFFFFF"
-} #
+    } #
 color.map.gse6364.type <- function(mol.biol) {
 	if (mol.biol=="Early Secretory Phase Endometriosis") "red"
 	else if (mol.biol=="Proliferative Phase Endometriosis") "red" 
@@ -298,24 +346,24 @@ color.map.gse6364.type <- function(mol.biol) {
 	else if (mol.biol=="Proliferative Phase Normal") "#9C897E" 
 	else if (mol.biol=="Early Secretory Phase Normal") "#9C897E" 
 	else "#FFFFFF"
-} 
+    } 
 color.map.gse5108.type <- function(mol.biol) {
     if (str_detect(mol.biol, 'endometriosis')) "red"
     else if (str_detect(mol.biol, 'eutopic endometrium')) "#9C897E" #grey
     else '#FFFFFF'
-}
+    }
 #rowsidecolors - red is upregulated, green is downregulated
 bildColors.colorize <- function(abbrv){ 
     if ( is.na(abbrv) ) '#FFFFFF' # missing
 	else if (abbrv == 'UP.BILD') 'red'
 	else if (abbrv == 'DN.BILD') 'green'
 	else '#FFFFFF' #insignificant cases 
-} 
+    }    
 klColors.colorize = function(abbrv){
 	if (abbrv == 'UP.KL') {return('red')}
 	else if (abbrv == 'DN.KL') {return('green')}
 	else return('#FFFFFF') #insignificant cases
-}
+    }
 build.side.map = function(df){
 	### takes dataframe, merges with the Src signature and creates RowSideColors for our plots
 	## df is the full dataframe, with FC and P values
@@ -407,12 +455,6 @@ srcGeneLookup <- function(probes) {
         )
     )
 }
-#srcGeneLookup.plus <- function(affyP) {
-#    indices <- unlist(lapply(david.src$affyProbe, match, affyP), use.names=F)
-#    genes <- (david.src$GeneSymbol[indices])
-#    genes[is.na(genes)] <- 'unknown'
-#    return(genes)
-#}   
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### make volcano plot plus ##TODO: GENESYMBOL MAPPING NOT WORKING
@@ -689,7 +731,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=N
 ### Processing Tothill (GSE9891) data:
 #reorder columns accordind to the manifest
 dfTothill <- tothill.src[,tothill.s.sort$geo_accession]
-#TODO: remove COL1A1? 
+#TODO: remove COL1A1? #Houtan says this is an outlier (seems consistent in every dataset!)
 dfTothill <- dfTothill[-which(rownames(dfTothill) == "1556499_s_at"),]
 #dfTothill <- log2(dfTothill)
 endometriosis <- which(str_detect(tothill.s.sort$characteristics_ch1a, 'Endo')) 
@@ -714,7 +756,10 @@ dfTothill.hvb <- plotBildDirectionality(dfTothill, tothill.s, color.map.tothill.
     title = 'Tothill Bild Sorted',
     filename = 'dfTothill.bild.sorted.svg'
     )
-    
+
+## Processing GSE39204
+df39204 <- gse39204.src[,gse39204.s.sort$geo_accession]    
+df39204 <- df39204[-which(rownames(df39204) == "1556499_s_at"),] #COL1A1
     
 ### Processing GSE7305
 df7305 <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
