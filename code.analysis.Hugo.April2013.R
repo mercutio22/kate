@@ -279,8 +279,8 @@ gse30161.s.sort <- sort.data.frame(gse30161.s[,c("geo_accession","characteristic
 
 ## ColSideColors - red is cancer, grey is normal, #CB4B16' #not endometrioid cancer
 color.map.gse29175.type <- function(mol.biol) {
-    if (str_detect(mol.biol, 'non-OCCC')) '#CB4B16' #different red for different kind of cancer
-    else if (mol.biol == 'histology: OCCC') '#red' #OCCC is considered endometriosis-derived cancer
+    if (str_detect(mol.biol, 'non-OCCC')) '#CB4B16' #different ovarian cancer
+    else if (mol.biol == 'histology: OCCC') 'red' #OCCC is considered endometriosis-derived cancer
     else '#FFFFFF' #white
 }
 color.map.gse39204.type <- function(mol.biol) {
@@ -292,13 +292,13 @@ color.map.gse39204.type <- function(mol.biol) {
     else '#FFFFFF' #white
     }
 color.map.gse29450.type <- function(mol.biol) {
-    if ( str_detect('clear cell ovarian cancer') ) 'red'
-    else if ( str_detect('normal') ) "#9C897E" #grey
+    if ( str_detect(mol.biol, 'clear cell ovarian cancer') ) 'red'
+    else if ( str_detect(mol.biol, 'Normal') ) "#9C897E" #grey
     else '#FFFFFF' #white
     }
 color.map.gse30161.type <- function(mol.biol) {
-    if ( str_detect('Endometrioid') |
-         str_detect('Clear') ) 'red'
+    if ( str_detect(mol.biol, 'Endometrioid') |
+         str_detect(mol.biol, 'Clear') ) 'red'
     else if ( str_detect('Mucinous') |
               str_detect('Serous') ) '#CB4B16' #different kind of cancer
     else '#FFFFFF' # white
@@ -313,7 +313,7 @@ color.map.tothill.type.houtan <- function(mol.biol) {
 	else if (mol.biol=="Ovary") "#red" #red
 	else if (mol.biol=="Peritoneum") "black"
 	else "#FFFFFF" #white
-    } #
+    } 
 color.map.tothill.type <- function(mol.biol) {
     if (str_detect(mol.biol, 'Endo')) 'red'
     else if ( str_detect(mol.biol, 'Ser') ) '#CB4B16' #orangy
@@ -326,18 +326,18 @@ color.map.gse6008.type <- function(mol.biol) {
 	else if (mol.biol=="Mucinous") "black"
 	else if (mol.biol=="Serous") "yellow"
 	else "#FFFFFF"
-    } #
+    } 
 color.map.gse7307.type <- function(mol.biol) {
 	if (mol.biol=="myometrium") "green" #green
 	else if (mol.biol=="endometrium/ovary") "red" 
 	else if (mol.biol=="endometrium") "#9C897E" #grey
 	else "#FFFFFF"
-    }       #
+    }       
 color.map.gse7305.type <- function(mol.biol) {
 	if (mol.biol=="Endometrium/Ovary-Disease") "red" 
 	else if (mol.biol=="Endometrium-Normal") "#9C897E" #grey
 	else "#FFFFFF"
-    } #
+    } 
 color.map.gse6364.type <- function(mol.biol) {
 	if (mol.biol=="Early Secretory Phase Endometriosis") "red"
 	else if (mol.biol=="Proliferative Phase Endometriosis") "red" 
@@ -727,7 +727,7 @@ function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=N
     return(hv)
 }
 
-
+#TODO: figure out how to insert color legend in plots
 ### Processing Tothill (GSE9891) data:
 #reorder columns accordind to the manifest
 dfTothill <- tothill.src[,tothill.s.sort$geo_accession]
@@ -736,30 +736,160 @@ dfTothill <- dfTothill[-which(rownames(dfTothill) == "1556499_s_at"),]
 #dfTothill <- log2(dfTothill)
 endometriosis <- which(str_detect(tothill.s.sort$characteristics_ch1a, 'Endo')) 
 otherovarian <- which(!str_detect(tothill.s.sort$characteristics_ch1a, 'Endo'))
-dfTothill <- cbind.data.frame(dfTothill[,endometriosis], dfTothill[,otherovarian])
-dfTothill$mean.N <- apply(dfTothill[,endometriosis], 1, mean, na.rm=T)
-dfTothill$mean.T <- apply(dfTothill[,otherovarian], 1, mean, na.rm=T)
-dfTothill$p.value <-
+mean.n <- apply(dfTothill[,endometriosis], 1, mean, na.rm=T)
+mean.t <- apply(dfTothill[,otherovarian], 1, mean, na.rm=T)
+p.value <-
    apply(dfTothill, 1, func.list$studentT, s1=endometriosis, s2=otherovarian)
+dfTothill <- cbind.data.frame(dfTothill[,endometriosis], dfTothill[,otherovarian])
+dfTothill$mean.N <- mean.n
+dfTothill$mean.T <- mean.t
+dfTothill$p.value <- p.value
 dfTothill$FC <- with(dfTothill, mean.T - mean.N)
 #Plotting
 plotVolcano(dfTothill,
     title="Volcano Plot, Endometriosis vs Other Ovarian Carcinomas (GSE9891)", 
-    filename='dfTothill.volcano.svg'
+    filename='gseTothill.volcano.svg'
     )
 dfTothill.hv <- plotHeatmap(dfTothill, tothill.s, 
     colormap=color.map.tothill.type,
     title = 'Tothill',
-    filename = 'dfTothill.heatmap.svg'
+    filename = 'gseTothill.heatmap.svg'
     )
 dfTothill.hvb <- plotBildDirectionality(dfTothill, tothill.s, color.map.tothill.type,
     title = 'Tothill Bild Sorted',
-    filename = 'dfTothill.bild.sorted.svg'
+    filename = 'gseTothill.bild.sorted.svg'
     )
 
-## Processing GSE39204
+## Processing GSE39204 #already log2-converted
 df39204 <- gse39204.src[,gse39204.s.sort$geo_accession]    
 df39204 <- df39204[-which(rownames(df39204) == "1556499_s_at"),] #COL1A1
+## subsetting part is specific to each dataset (not easily generalizable)
+endometriosis <- which( 
+    str_detect(gse39204.s.sort$characteristics_ch1a, 'histology: clear') | 
+    str_detect(gse39204.s.sort$characteristics_ch1a,'endometrioid') 
+    ) 
+otherovarian <- which( 
+    !str_detect(gse39204.s.sort$characteristics_ch1a, 'histology: clear') & 
+    !str_detect(gse39204.s.sort$characteristics_ch1a, 'endometrioid')
+    )
+## end of specific subsetting 
+mean.n <- apply(df39204[,endometriosis], 1, mean, na.rm=T)
+mean.t <- apply(df39204[,otherovarian], 1, mean, na.rm=T)
+p.value <-
+   apply(df39204, 1, func.list$studentT, s1=endometriosis, s2=otherovarian)
+df39204 <- cbind.data.frame(df39204[,endometriosis], df39204[,otherovarian])
+df39204$mean.N <- mean.n
+df39204$mean.T <- mean.t
+df39204$p.value <- p.value
+df39204$FC <- with(df39204, mean.T - mean.N)
+#Plotting
+plotVolcano(df39204,
+    title="Volcano Plot, Endometriosis vs Other Ovarian Carcinomas (GSE39204)", 
+    filename='gse39204.volcano.svg'
+    )
+df39204.hv <- plotHeatmap(df39204, gse39204.s, 
+    colormap=color.map.gse39204.type,
+    title = 'GSE39204',
+    filename = 'gse39204.heatmap.svg'
+    )
+df39204.hvb <- plotBildDirectionality(df39204, gse39204.s, color.map.gse39204.type,
+    title = 'GSE39204 Bild Sorted',
+    filename = 'gse39204.bild.sorted.svg'
+    )
+## Processing GSE29175 #already log2-converted
+df29175 <- gse29175.src[,gse29175.s.sort$geo_accession]    
+## subsetting part is specific to each dataset (not easily generalizable)
+endometriosis <- which( 
+    str_detect(gse29175.s.sort$characteristics_ch1a, 'histology: OCCC')  
+    ) 
+otherovarian <- which(str_detect(gse29175.s.sort$characteristics_ch1a, 'non-OCCC'))
+## end of specific subsetting 
+mean.n <- apply(df29175[,endometriosis], 1, mean, na.rm=T)
+mean.t <- apply(df29175[,otherovarian], 1, mean, na.rm=T)
+p.value <-
+   apply(df29175, 1, func.list$studentT, s1=endometriosis, s2=otherovarian)
+df29175 <- cbind.data.frame(df29175[,endometriosis], df29175[,otherovarian])
+df29175$mean.N <- mean.n
+df29175$mean.T <- mean.t
+df29175$p.value <- p.value
+df29175$FC <- with(df29175, mean.T - mean.N)
+#Plotting
+plotVolcano(df29175,
+    title="Volcano Plot, Endometriosis vs Other Ovarian Carcinomas (GSE29175)", 
+    filename='gse29175.volcano.svg'
+    )
+df29175.hv <- plotHeatmap(df29175, gse29175.s, 
+    colormap=color.map.gse29175.type,
+    title = '29175',
+    filename = 'gse29175.heatmap.svg'
+    )
+df29175.hvb <- plotBildDirectionality(df29175, gse29175.s, color.map.gse29175.type,
+    title = '29175 Bild Sorted',
+    filename = 'gse29175.bild.sorted.svg'
+    )
+
+## Processing GSE29450 #already log2-converted
+df29450 <- gse29450.src[,gse29450.s.sort$geo_accession]    
+## subsetting part is specific to each dataset (not easily generalizable)
+endometriosis <- which( 
+    str_detect(gse29450.s.sort$characteristics_ch1a, 'clear cell ovarian cancer')  
+    ) 
+otherovarian <- which(str_detect(gse29450.s.sort$characteristics_ch1a, 'epithelium'))
+## end of specific subsetting 
+mean.n <- apply(df29450[,endometriosis], 1, mean, na.rm=T)
+mean.t <- apply(df29450[,otherovarian], 1, mean, na.rm=T)
+p.value <-
+   apply(df29450, 1, func.list$studentT, s1=endometriosis, s2=otherovarian)
+df29450 <- cbind.data.frame(df29450[,endometriosis], df29450[,otherovarian])
+df29450$mean.N <- mean.n
+df29450$mean.T <- mean.t
+df29450$p.value <- p.value
+df29450$FC <- with(df29450, mean.T - mean.N)
+#Plotting
+plotVolcano(df29450,
+    title="Volcano Plot, Endometriosis vs Other Ovarian Carcinomas (GSE29450)", 
+    filename='gse29450.volcano.svg'
+    )
+df29450.hv <- plotHeatmap(df29450, gse29450.s, 
+    colormap=color.map.gse29450.type,
+    title = 'gse29450',
+    filename = 'gse29450.heatmap.svg'
+    )
+df29450.hvb <- plotBildDirectionality(df29450, gse29450.s, color.map.gse29450.type,
+    title = '29450 Bild Sorted',
+    filename = 'gse29450.bild.sorted.svg'
+    )
+
+## Processing GSE30161 #already log2-converted
+df30161 <- gse30161.src[,gse30161.s.sort$geo_accession]
+## subsetting part is specific to each dataset (not easily generalizable)
+endometriosis <- which( str_detect('Endometrioid') | str_detect('Clear') )
+otherovarian <- which( !str_detect('Endometrioid') & !str_detect('Clear') )
+# end of specific subsetting 
+mean.n <- apply(df30161[,endometriosis], 1, mean, na.rm=T)
+mean.t <- apply(df30161[,otherovarian], 1, mean, na.rm=T)
+p.value <-
+   apply(df30161, 1, func.list$studentT, s1=endometriosis, s2=otherovarian)
+df30161 <- cbind.data.frame(df30161[,endometriosis], df30161[,otherovarian])
+df30161$mean.N <- mean.n
+df30161$mean.T <- mean.t
+df30161$p.value <- p.value
+df30161$FC <- with(df30161, mean.T - mean.N)
+#Plotting
+plotVolcano(df30161,
+    title="Volcano Plot, Endometriosis vs Other Ovarian Carcinomas (GSE30161)",
+    filename='gse30161.volcano.svg'
+    )
+df30161.hv <- plotHeatmap(df30161, gse30161.s,
+    colormap=color.map.gse30161.type,
+    title = 'gse30161',
+    filename = 'gse30161.heatmap.svg'
+    )
+df30161.hvb <- plotBildDirectionality(df30161, gse30161.s, color.map.gse30161.type,
+    title = '30161 Bild Sorted',
+    filename = 'gse30161.bild.sorted.svg'
+    )
+
     
 ### Processing GSE7305
 df7305 <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
