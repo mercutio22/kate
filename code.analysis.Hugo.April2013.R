@@ -291,6 +291,14 @@ color.map.gse39204.type <- function(mol.biol) {
               str_detect(mol.biol, 'carcinoma') )'#CB4B16' #different kind of cancer 
     else '#FFFFFF' #white
     }
+color.map.gse39204.type2 <- function(mol.biol) {
+    if ( str_detect(mol.biol, 'histology: clear') ) '#FF3300' #lightred 
+    else if ( str_detect(mol.biol, 'endometrioid') ) '#FFCC00' #yellowish
+    else if ( str_detect(mol.biol, 'serous')  )'#0000FF' 
+    else if ( str_detect(mol.biol, 'mucinous') )'#6600FF'
+    else if ( str_detect(mol.biol, 'carcinosarcoma') )'#CC00FF' #different kind of cancer 
+    else '#FFFFFF' #white
+    }
 color.map.gse29450.type <- function(mol.biol) {
     if ( str_detect(mol.biol, 'clear cell ovarian cancer') ) 'red'
     else if ( str_detect(mol.biol, 'Normal') ) "#9C897E" #grey
@@ -299,8 +307,8 @@ color.map.gse29450.type <- function(mol.biol) {
 color.map.gse30161.type <- function(mol.biol) {
     if ( str_detect(mol.biol, 'Endometrioid') |
          str_detect(mol.biol, 'Clear') ) 'red'
-    else if ( str_detect('Mucinous') |
-              str_detect('Serous') ) '#CB4B16' #different kind of cancer
+    else if ( str_detect(mol.biol, 'Mucinous') |
+              str_detect(mol.biol, 'Serous') ) '#CB4B16' #different kind of cancer
     else '#FFFFFF' # white
     }
 color.map.gse37837.type <- function(mol.biol) {
@@ -409,22 +417,23 @@ build.side.map.plus <- function(df, probemap=hgu133plus2GENENAME) {
 	return(colors) 
 }
 
-build.top.map = function(df, df.s, df.colormap.function){
+build.top.map = function(df, df.s, df.colormap.function, df.colormap.function2=NA,
+        labels=c('group1', 'group2') ){
 	#builds the heatmap top rows for helping group visualization
 	## df is the full dataframe, with FC and P values
 	## df.colormap.function maps metadata with colors
 	cols = as.matrix(colnames(df[1:(ncol(df)-4)]))
-	if ('Sample' %in% colnames(df.s)){
-	df.src.type = apply(cols,
-		1,
-		func.list$vlookup,
-		df.s[,c("Sample","characteristics_ch1a")],
-		"characteristics_ch1a")
-	}
-	else { df.src.type = apply(cols,
-	1,
-	func.list$vlookup,df.s[,c("geo_accession","characteristics_ch1a")],
-        "characteristics_ch1a")
+	if ('Sample' %in% colnames(df.s) ) {
+	    df.src.type = apply(cols,
+		    1,
+		    func.list$vlookup,
+		    df.s[,c("Sample","characteristics_ch1a")],
+		    "characteristics_ch1a")
+	} else { 
+        df.src.type = apply(cols,
+	    1,
+	    func.list$vlookup,df.s[,c("geo_accession","characteristics_ch1a")],
+            "characteristics_ch1a")
 	}
 	df.src.type = as.character(df.src.type)
 	df.src.type[is.na(df.src.type)] = c('0')
@@ -432,7 +441,18 @@ build.top.map = function(df, df.s, df.colormap.function){
 	ColSideColors = matrix(as.character(c(cc.df.src.type)), 
 			nrow = length(cc.df.src.type),
 			ncol = 1)
-	ColSideColors = cbind(ColSideColors, ColSideColors) #2columns make it thicker 
+    if (is.na(df.colormap.function2) ) {
+	    ColSideColors = cbind(ColSideColors, ColSideColors) #2columns make it thicker 
+    } else {
+        df.src.type2 = as.character(df.src.type)
+        df.src.type2[is.na(df.src.type2)] = c('0')
+        cc.df.src.type2 = unlist(lapply(df.src.type2, df.colormap.function2))
+        ColSideColors2 = matrix(as.character(c(cc.df.src.type2)), 
+                nrow = length(cc.df.src.type2),
+                ncol = 1)
+	    ColSideColors = cbind(ColSideColors, ColSideColors2) #2columns make it thicker 
+        colnames(ColSideColors) <- labels
+    }
 	return(ColSideColors)
 }
 
@@ -830,6 +850,8 @@ df29175.hvb <- plotBildDirectionality(df29175, gse29175.s, color.map.gse29175.ty
 
 ## Processing GSE29450 #already log2-converted
 df29450 <- gse29450.src[,gse29450.s.sort$geo_accession]    
+#removing COL1A1 
+df29450 <- df29450[-which(rownames(df29450) == "1556499_s_at"),]
 ## subsetting part is specific to each dataset (not easily generalizable)
 endometriosis <- which( 
     str_detect(gse29450.s.sort$characteristics_ch1a, 'clear cell ovarian cancer')  
@@ -863,8 +885,14 @@ df29450.hvb <- plotBildDirectionality(df29450, gse29450.s, color.map.gse29450.ty
 ## Processing GSE30161 #already log2-converted
 df30161 <- gse30161.src[,gse30161.s.sort$geo_accession]
 ## subsetting part is specific to each dataset (not easily generalizable)
-endometriosis <- which( str_detect('Endometrioid') | str_detect('Clear') )
-otherovarian <- which( !str_detect('Endometrioid') & !str_detect('Clear') )
+endometriosis <- which( 
+    str_detect(gse30161.s.sort$characteristics_ch1a, 'Endometrioid') | 
+    str_detect(gse30161.s.sort$characteristics_ch1a, 'Clear') 
+    )
+otherovarian <- which( 
+    !str_detect(gse30161.s.sort$characteristics_ch1a, 'Endometrioid') & 
+    !str_detect(gse30161.s.sort$characteristics_ch1a, 'Clear') 
+    )
 # end of specific subsetting 
 mean.n <- apply(df30161[,endometriosis], 1, mean, na.rm=T)
 mean.t <- apply(df30161[,otherovarian], 1, mean, na.rm=T)
