@@ -182,7 +182,9 @@ Src.signature$GeneSymbol <- unlist(
     mget(Src.signature$ProbeID, hgu133plus2SYMBOL, ifnotfound=NA), 
     use.names=F)
 rename <- with(Src.signature, which(is.na(GeneSymbol)))
-Src.signature$GeneSymbol[rename] <- 'unknown'
+Src.signature$GeneSymbol[rename] <- Src.signature$ProbeID[rename]
+Src.signature.out <- Src.signature[,c(1:2,7)]
+colnames(Src.signature.out)[3] <- 'Bild.direction'
 src = Src.signature #some of houtan's code reference this variable name
 # used to subset Codelink probeIDs:
 tmp <- unlist(
@@ -288,7 +290,7 @@ color.map.gse39204.type <- function(mol.biol) {
          str_detect(mol.biol, 'endometrioid') ) 'red'
     else if ( str_detect(mol.biol, 'serous') | 
               str_detect(mol.biol, 'mucinous') | 
-              str_detect(mol.biol, 'carcinoma') )'#CB4B16' #different kind of cancer 
+              str_detect(mol.biol, 'carcinosarcoma') )'#CB4B16' #different kind of cancer 
     else '#FFFFFF' #white
     }
 color.map.gse39204.type2 <- function(mol.biol) {
@@ -450,7 +452,7 @@ build.top.map = function(df, df.s, df.colormap.function, df.colormap.function2=N
         ColSideColors2 = matrix(as.character(c(cc.df.src.type2)), 
                 nrow = length(cc.df.src.type2),
                 ncol = 1)
-	    ColSideColors = cbind(ColSideColors, ColSideColors2) #2columns make it thicker 
+	    ColSideColors = cbind(ColSideColors2, ColSideColors) #2columns make it thicker 
         colnames(ColSideColors) <- labels
     }
 	return(ColSideColors)
@@ -651,53 +653,58 @@ plotVolcano <- function(df,
     dev.off()
 } 
 plotHeatmap <-
-function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=NA) {
-    svg(filename=filename)
-    #colnames I always want removed:
-    filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
-    # R syntax can become ugly. This is how I acchieve removal by colname
-    filterout <-
-    -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
-    filtered = df[,filterout]
-    if ( is.na(probemap) | missing(probemap) ){
-        labRow <- srcGeneLookup(rownames(df))
-        RowSideColors <- build.side.map(df)
-    } else {
-        labRow <- unlist(mget(rownames(df), probemap), use.names=F)
-        RowSideColors <- build.side.map.plus(df, probemap)
+function(df, df.s, colormap, 
+    colormap2=NA, 
+    filename='Heatmap.svg', 
+    title='Heatmap', 
+    probemap=NA, 
+    labels=c('group1', 'group2')) {
+        svg(filename=filename)
+        #colnames I always want removed:
+        filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
+        # R syntax can become ugly. This is how I acchieve removal by colname
+        filterout <-
+        -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
+        filtered = df[,filterout]
+        if ( is.na(probemap) | missing(probemap) ){
+            labRow <- srcGeneLookup(rownames(df))
+            RowSideColors <- build.side.map(df)
+        } else {
+            labRow <- unlist(mget(rownames(df), probemap), use.names=F)
+            RowSideColors <- build.side.map.plus(df, probemap)
+        }
+        hv <- heatmap.plus(
+            as.matrix(filtered), # PLOTS ONLY THE SAMPLE COLUMNS
+            na.rm=TRUE,
+            scale="none",
+            #scale="row",
+            ColSideColors=build.top.map(df, df.s, colormap, colormap2, labels),
+            RowSideColors=RowSideColors, 
+            col=jet.colors(75),
+            key=FALSE,
+            #key=T, 
+            symkey=FALSE,
+            #symkey=T,
+            density.info="none",
+            trace="none",
+            Rowv=TRUE,
+            Colv=NA,
+            cexRow=0.6,
+            cexCol=0.6,
+            keysize=2,
+            dendrogram=c("none"),
+            main = paste(title,
+                dim(filtered)[1],
+                "Probes; ",
+                dim(filtered)[2],
+                "Samples"
+                ),
+            labRow=labRow,
+            margin = c(10,10)
+        )
+        dev.off()
+        return(hv)
     }
-    hv <- heatmap.plus(
-        as.matrix(filtered), # PLOTS ONLY THE SAMPLE COLUMNS
-        na.rm=TRUE,
-        scale="none",
-        #scale="row",
-        ColSideColors=build.top.map(df, df.s, colormap),
-        RowSideColors=RowSideColors, 
-        col=jet.colors(75),
-        key=FALSE,
-        #key=T, 
-        symkey=FALSE,
-        #symkey=T,
-        density.info="none",
-        trace="none",
-        Rowv=TRUE,
-        Colv=NA,
-        cexRow=0.6,
-        cexCol=0.6,
-        keysize=2,
-        dendrogram=c("none"),
-        main = paste(title,
-            dim(filtered)[1],
-            "Probes; ",
-            dim(filtered)[2],
-            "Samples"
-            ),
-        labRow=labRow,
-        margin = c(10,10)
-    )
-    dev.off()
-    return(hv)
-}
 plotBildDirectionality <-
 function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=NA) {
     #Produces a heatmap sorted according to Bild Directionality
@@ -754,8 +761,17 @@ dfTothill <- tothill.src[,tothill.s.sort$geo_accession]
 #TODO: remove COL1A1? #Houtan says this is an outlier (seems consistent in every dataset!)
 dfTothill <- dfTothill[-which(rownames(dfTothill) == "1556499_s_at"),]
 #dfTothill <- log2(dfTothill)
-endometriosis <- which(str_detect(tothill.s.sort$characteristics_ch1a, 'Endo')) 
-otherovarian <- which(!str_detect(tothill.s.sort$characteristics_ch1a, 'Endo'))
+
+
+endometriosis <- rownames(tothill.s.sort)[
+    str_detect(tothill.s.sort$characteristics_ch1a, 'Endo')]
+otherovarian <- rownames(tothill.s.sort)[
+    str_detect(tothill.s.sort$characteristics_ch1a, 'Ser') | 
+    str_detect(tothill.s.sort$characteristics_ch1a, 'Adeno') 
+    ]
+
+#endometriosis <- which(str_detect(tothill.s.sort$characteristics_ch1a, 'Endo')) 
+#otherovarian <- which(!str_detect(tothill.s.sort$characteristics_ch1a, 'Endo'))
 mean.n <- apply(dfTothill[,endometriosis], 1, mean, na.rm=T)
 mean.t <- apply(dfTothill[,otherovarian], 1, mean, na.rm=T)
 p.value <-
@@ -779,19 +795,36 @@ dfTothill.hvb <- plotBildDirectionality(dfTothill, tothill.s, color.map.tothill.
     title = 'Tothill Bild Sorted',
     filename = 'gseTothill.bild.sorted.svg'
     )
+dfTothill.out<-dfTothill[,c('p.value', 'FC')] 
+dfTothill.out$id <- dimnames(dfTothill.out)[[1]] #row
 
 ## Processing GSE39204 #already log2-converted
 df39204 <- gse39204.src[,gse39204.s.sort$geo_accession]    
 df39204 <- df39204[-which(rownames(df39204) == "1556499_s_at"),] #COL1A1
+#remove <- rownames(
+#    gse39204.s[which(
+#        gse39204.s$characteristics_ch1a == "histology: serous/clear" |
+#        gse39204.s$characteristics_ch1a == "histology: undifferentiated" |
+#        gse39204.s$characteristics_ch1a == "histology: carcinosarcoma"
+#        
+#        ) ,]
+#    )
+#df39204 <- df39204[,setdiff(colnames(df39204), remove)]
 ## subsetting part is specific to each dataset (not easily generalizable)
-endometriosis <- which( 
+#endometriosis <- which( 
+#    str_detect(gse39204.s.sort$characteristics_ch1a, 'histology: clear') | 
+#    str_detect(gse39204.s.sort$characteristics_ch1a,'endometrioid') 
+#    )
+endometriosis <- rownames(gse39204.s.sort)[
     str_detect(gse39204.s.sort$characteristics_ch1a, 'histology: clear') | 
     str_detect(gse39204.s.sort$characteristics_ch1a,'endometrioid') 
-    ) 
-otherovarian <- which( 
-    !str_detect(gse39204.s.sort$characteristics_ch1a, 'histology: clear') & 
-    !str_detect(gse39204.s.sort$characteristics_ch1a, 'endometrioid')
-    )
+    ]
+otherovarian <- rownames(gse39204.s.sort)[
+    str_detect(gse39204.s.sort$characteristics_ch1a, 'histology: serous') | 
+    str_detect(gse39204.s.sort$characteristics_ch1a, 'mucinous') |
+    str_detect(gse39204.s.sort$characteristics_ch1a, 'histology: serous low grade') 
+    ]
+    
 ## end of specific subsetting 
 mean.n <- apply(df39204[,endometriosis], 1, mean, na.rm=T)
 mean.t <- apply(df39204[,otherovarian], 1, mean, na.rm=T)
@@ -809,6 +842,8 @@ plotVolcano(df39204,
     )
 df39204.hv <- plotHeatmap(df39204, gse39204.s, 
     colormap=color.map.gse39204.type,
+    colormap2=color.map.gse39204.type2,
+    labels=c('subtypes', 'Endo vs other'),
     title = 'GSE39204',
     filename = 'gse39204.heatmap.svg'
     )
@@ -816,6 +851,9 @@ df39204.hvb <- plotBildDirectionality(df39204, gse39204.s, color.map.gse39204.ty
     title = 'GSE39204 Bild Sorted',
     filename = 'gse39204.bild.sorted.svg'
     )
+df39204.out<-df39204[,c('p.value', 'FC')] 
+df39204.out$id <- dimnames(df39204.out)[[1]] #row
+
 ## Processing GSE29175 #already log2-converted
 df29175 <- gse29175.src[,gse29175.s.sort$geo_accession]    
 ## subsetting part is specific to each dataset (not easily generalizable)
@@ -847,6 +885,8 @@ df29175.hvb <- plotBildDirectionality(df29175, gse29175.s, color.map.gse29175.ty
     title = '29175 Bild Sorted',
     filename = 'gse29175.bild.sorted.svg'
     )
+df29175.out<-df29175[,c('p.value', 'FC')] 
+df29175.out$id <- dimnames(df29175.out)[[1]] #row
 
 ## Processing GSE29450 #already log2-converted
 df29450 <- gse29450.src[,gse29450.s.sort$geo_accession]    
@@ -881,18 +921,22 @@ df29450.hvb <- plotBildDirectionality(df29450, gse29450.s, color.map.gse29450.ty
     title = '29450 Bild Sorted',
     filename = 'gse29450.bild.sorted.svg'
     )
+df29450.out<-df29450[,c('p.value', 'FC')] 
+df29450.out$id <- dimnames(df29450.out)[[1]] #row
 
 ## Processing GSE30161 #already log2-converted
 df30161 <- gse30161.src[,gse30161.s.sort$geo_accession]
+df30161 <- df30161[-which(rownames(df30161) == "1556499_s_at"),] # outlier
+df30161 <- df30161[-which(rownames(df30161) == "224321_at"),] # outlier
 ## subsetting part is specific to each dataset (not easily generalizable)
-endometriosis <- which( 
-    str_detect(gse30161.s.sort$characteristics_ch1a, 'Endometrioid') | 
-    str_detect(gse30161.s.sort$characteristics_ch1a, 'Clear') 
-    )
-otherovarian <- which( 
-    !str_detect(gse30161.s.sort$characteristics_ch1a, 'Endometrioid') & 
-    !str_detect(gse30161.s.sort$characteristics_ch1a, 'Clear') 
-    )
+endometriosis <- rownames(gse30161.s.sort)[
+    str_detect(gse30161.s.sort$characteristics_ch1a, 'Clear') | 
+    str_detect(gse30161.s.sort$characteristics_ch1a,'Endometrioid') 
+    ]
+otherovarian <- rownames(gse30161.s.sort)[
+    str_detect(gse30161.s.sort$characteristics_ch1a, 'Serous') | 
+    str_detect(gse30161.s.sort$characteristics_ch1a, 'Mucinous') 
+    ]
 # end of specific subsetting 
 mean.n <- apply(df30161[,endometriosis], 1, mean, na.rm=T)
 mean.t <- apply(df30161[,otherovarian], 1, mean, na.rm=T)
@@ -917,7 +961,8 @@ df30161.hvb <- plotBildDirectionality(df30161, gse30161.s, color.map.gse30161.ty
     title = '30161 Bild Sorted',
     filename = 'gse30161.bild.sorted.svg'
     )
-
+df30161.out<-df30161[,c('p.value', 'FC')] 
+df30161.out$id <- rownames(df30161.out) #row
     
 ### Processing GSE7305
 df7305 <- as.matrix(gse7305.src[,as.character(gse7305.s.sort[,1])])
@@ -946,6 +991,8 @@ gse7305.hvb <- plotBildDirectionality(df7305, gse7305.s, color.map.gse7305.type,
     title = 'GSE7305 Bild Sorted',
     filename = 'gse7305.bild.sorted.svg'
     )
+df7305.out<-df7305[,c('p.value', 'FC')] 
+df7305.out$id <- dimnames(df7305.out)[[1]] #row
 
 ### Preprocessing GSE7307
 df7307 <- as.matrix(gse7307.src[,as.character(gse7307.s.sort[,1])])
@@ -975,6 +1022,8 @@ gse7307.hvb <- plotBildDirectionality(df7307, gse7307.s, color.map.gse7307.type,
     title = 'GSE7307 Bild Sorted',
     filename = 'gse7307.bild.sorted.svg'
     )
+df7307.out<-df7307[,c('p.value', 'FC')] 
+df7307.out$id <- dimnames(df7307.out)[[1]] #row
 
 ### Preprocessing GSE6364
 df6364 <- as.matrix(gse6364.src[,as.character(gse6364.s.sort[,1])])
@@ -1009,7 +1058,22 @@ gse6364.hvb <- plotBildDirectionality(df6364, gse6364.s, color.map.gse6364.type,
     title = 'GSE6364 Bild Sorted',
     filename = 'gse6364.bild.sorted.svg'
     )
+df6364.out<-df6364[,c('p.value', 'FC')] 
+df6364.out$id <- dimnames(df6364.out)[[1]] #row
 
+##################################
+#  FINAL TABLE                   #
+##################################
+list.names <- c("df6364.out", "df30161.out", "df29450.out", "df29175.out", "dfTothill.out", "df39204.out", "df7307.out", "df7305.out")
+list.objects <- list(df6364.out, df30161.out, df29450.out, df29175.out, dfTothill.out, df39204.out, df7307.out, df7305.out)
+names(list.objects) <- list.names
+for ( i in list.names ) {
+    final.table <- merge(Src.signature.out, list.objects[[i]], by.x='ProbeID', by.y='id', all.x=T)
+    write.table(final.table, 
+                file=paste(i, '.txt', sep=''), 
+                quote=F, row.names=F, sep='\t'
+                )
+    }
 ###################################
 #### NON-AFFY U133 v2.0 DATASETS  #
 ###################################
