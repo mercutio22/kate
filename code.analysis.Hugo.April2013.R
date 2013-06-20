@@ -162,20 +162,8 @@ colnames(Src.signature) = c('ProbeID', 'GeneSymbol', 'Description', 'LocusLink',
 ### adjust this criteria
 Src.signature$logFC <- log2(Src.signature$FoldChange)
 Src.signature$direction <- NA
-#Src.signature$direction[Src.signature$FoldChange<1] <- c("DN.BILD") # just to denote this info is not from our analysis (BILD) 
-#Src.signature$direction[Src.signature$FoldChange>1] <- c("UP.BILD")
 Src.signature$direction[Src.signature$logFC<0] <- c("DN.BILD") # just to denote this info is not from our analysis (BILD) 
 Src.signature$direction[Src.signature$logFC>0] <- c("UP.BILD")
-
-# src Gene signature file 
-# obtained by conveting affy probe names of each platform with DAVID (http://david.abcc.ncifcrf.gov/)
-#david.src = read.table('David.Src.txt', header=T) #maybe I should use the corresponding R/BioC Annotation package for consistency
-#david.src$To=toupper(as.character(david.src$To))
-#k <- c('PTHLH', 'ZNF12', 'SRC', 'PMS2L3', 'IRS1')
-#colnames(david.src) <- c('affyProbe', 'GeneSymbol')
-# getting illumina IDs:
-# davidIllumina <- read.table('david_affy_illumina.txt', header=T, sep='\t') #submitted david.src$From to DAVID conversion tool and got Illumina IDs 
-#indices <- match(david.src$affyProbe, Src.signature$ProbeID)
 
 #update Src.signature with updated gene symbols from the bioconductor bimap
 Src.signature$GeneSymbol <- unlist(
@@ -635,7 +623,6 @@ plotVolcano <- function(df,
     probemap=NA) {
     #custom volcano plot customized for kate's analysis
     svg(filename=filename)
-#    png(filename=filename)
     volcano.plus(df, 
         fold.change.col = "FC", 
         pv.col = "p.value", 
@@ -705,6 +692,49 @@ function(df, df.s, colormap,
         dev.off()
         return(hv)
     }
+
+buildDMatrix <- #builds an expression directionality matrix for a dataset
+function(df, colormap) {
+    bildExpDir <- build.side.map(df)[,1]
+    up <- which(bildExpDir == 'red')
+    down <- which(bildExpDir == 'green')
+    reorderRows <- c( up, down )
+    df <- df[reorderRows,]
+    #columns I always want removed:
+    filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
+    filterout <-
+    -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
+    filtered = df[,filterout]
+    m <- build.side.map(df)
+    reverse.map <- function(char){
+        if ( char == 'red' ) 1
+        else if (char == 'green') 2
+        else 0
+        }
+    return( unlist(lapply(m[,2], reverse.map)) )
+    }
+
+buildBildMatrix <- #builds an expression directionality matrix for a dataset
+function(df, colormap) {
+    bildExpDir <- build.side.map(df)[,1]
+    up <- which(bildExpDir == 'red')
+    down <- which(bildExpDir == 'green')
+    reorderRows <- c( up, down )
+    df <- df[reorderRows,]
+    #columns I always want removed:
+    filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
+    filterout <-
+    -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
+    filtered = df[,filterout]
+    m <- build.side.map(df)
+    reverse.map <- function(char){
+        if ( char == 'red' ) 1
+        else if (char == 'green') 2
+        else 0
+        } 
+    return( list(unlist(lapply(m[,1], reverse.map)), rownames(df) ) )
+    }
+
 plotBildDirectionality <-
 function(df, df.s, colormap, filename='Heatmap.svg', title='Heatmap', probemap=NA) {
     #Produces a heatmap sorted according to Bild Directionality
@@ -769,9 +799,6 @@ otherovarian <- rownames(tothill.s.sort)[
     str_detect(tothill.s.sort$characteristics_ch1a, 'Ser') | 
     str_detect(tothill.s.sort$characteristics_ch1a, 'Adeno') 
     ]
-
-#endometriosis <- which(str_detect(tothill.s.sort$characteristics_ch1a, 'Endo')) 
-#otherovarian <- which(!str_detect(tothill.s.sort$characteristics_ch1a, 'Endo'))
 mean.n <- apply(dfTothill[,endometriosis], 1, mean, na.rm=T)
 mean.t <- apply(dfTothill[,otherovarian], 1, mean, na.rm=T)
 p.value <-
@@ -801,20 +828,6 @@ dfTothill.out$id <- dimnames(dfTothill.out)[[1]] #row
 ## Processing GSE39204 #already log2-converted
 df39204 <- gse39204.src[,gse39204.s.sort$geo_accession]    
 df39204 <- df39204[-which(rownames(df39204) == "1556499_s_at"),] #COL1A1
-#remove <- rownames(
-#    gse39204.s[which(
-#        gse39204.s$characteristics_ch1a == "histology: serous/clear" |
-#        gse39204.s$characteristics_ch1a == "histology: undifferentiated" |
-#        gse39204.s$characteristics_ch1a == "histology: carcinosarcoma"
-#        
-#        ) ,]
-#    )
-#df39204 <- df39204[,setdiff(colnames(df39204), remove)]
-## subsetting part is specific to each dataset (not easily generalizable)
-#endometriosis <- which( 
-#    str_detect(gse39204.s.sort$characteristics_ch1a, 'histology: clear') | 
-#    str_detect(gse39204.s.sort$characteristics_ch1a,'endometrioid') 
-#    )
 endometriosis <- rownames(gse39204.s.sort)[
     str_detect(gse39204.s.sort$characteristics_ch1a, 'histology: clear') | 
     str_detect(gse39204.s.sort$characteristics_ch1a,'endometrioid') 
@@ -824,7 +837,6 @@ otherovarian <- rownames(gse39204.s.sort)[
     str_detect(gse39204.s.sort$characteristics_ch1a, 'mucinous') |
     str_detect(gse39204.s.sort$characteristics_ch1a, 'histology: serous low grade') 
     ]
-    
 ## end of specific subsetting 
 mean.n <- apply(df39204[,endometriosis], 1, mean, na.rm=T)
 mean.t <- apply(df39204[,otherovarian], 1, mean, na.rm=T)
@@ -834,7 +846,7 @@ df39204 <- cbind.data.frame(df39204[,endometriosis], df39204[,otherovarian])
 df39204$mean.N <- mean.n
 df39204$mean.T <- mean.t
 df39204$p.value <- p.value
-df39204$FC <- with(df39204, mean.T - mean.N)
+df39204$FC <- with(df39204, mean.N - mean.T)
 #Plotting
 plotVolcano(df39204,
     title="Volcano Plot, Endometriosis vs Other Ovarian Carcinomas (GSE39204)", 
@@ -854,39 +866,39 @@ df39204.hvb <- plotBildDirectionality(df39204, gse39204.s, color.map.gse39204.ty
 df39204.out<-df39204[,c('p.value', 'FC')] 
 df39204.out$id <- dimnames(df39204.out)[[1]] #row
 
-## Processing GSE29175 #already log2-converted
-df29175 <- gse29175.src[,gse29175.s.sort$geo_accession]    
-## subsetting part is specific to each dataset (not easily generalizable)
-endometriosis <- which( 
-    str_detect(gse29175.s.sort$characteristics_ch1a, 'histology: OCCC')  
-    ) 
-otherovarian <- which(str_detect(gse29175.s.sort$characteristics_ch1a, 'non-OCCC'))
-## end of specific subsetting 
-mean.n <- apply(df29175[,endometriosis], 1, mean, na.rm=T)
-mean.t <- apply(df29175[,otherovarian], 1, mean, na.rm=T)
-p.value <-
-   apply(df29175, 1, func.list$studentT, s1=endometriosis, s2=otherovarian)
-df29175 <- cbind.data.frame(df29175[,endometriosis], df29175[,otherovarian])
-df29175$mean.N <- mean.n
-df29175$mean.T <- mean.t
-df29175$p.value <- p.value
-df29175$FC <- with(df29175, mean.T - mean.N)
-#Plotting
-plotVolcano(df29175,
-    title="Volcano Plot, Endometriosis vs Other Ovarian Carcinomas (GSE29175)", 
-    filename='gse29175.volcano.svg'
-    )
-df29175.hv <- plotHeatmap(df29175, gse29175.s, 
-    colormap=color.map.gse29175.type,
-    title = '29175',
-    filename = 'gse29175.heatmap.svg'
-    )
-df29175.hvb <- plotBildDirectionality(df29175, gse29175.s, color.map.gse29175.type,
-    title = '29175 Bild Sorted',
-    filename = 'gse29175.bild.sorted.svg'
-    )
-df29175.out<-df29175[,c('p.value', 'FC')] 
-df29175.out$id <- dimnames(df29175.out)[[1]] #row
+### Processing GSE29175 #already log2-converted
+#df29175 <- gse29175.src[,gse29175.s.sort$geo_accession]    
+### subsetting part is specific to each dataset (not easily generalizable)
+#endometriosis <- which( 
+#    str_detect(gse29175.s.sort$characteristics_ch1a, 'histology: OCCC')  
+#    ) 
+#otherovarian <- which(str_detect(gse29175.s.sort$characteristics_ch1a, 'non-OCCC'))
+### end of specific subsetting 
+#mean.n <- apply(df29175[,endometriosis], 1, mean, na.rm=T)
+#mean.t <- apply(df29175[,otherovarian], 1, mean, na.rm=T)
+#p.value <-
+#   apply(df29175, 1, func.list$studentT, s1=endometriosis, s2=otherovarian)
+#df29175 <- cbind.data.frame(df29175[,endometriosis], df29175[,otherovarian])
+#df29175$mean.N <- mean.n
+#df29175$mean.T <- mean.t
+#df29175$p.value <- p.value
+#df29175$FC <- with(df29175, mean.T - mean.N)
+##Plotting
+#plotVolcano(df29175,
+#    title="Volcano Plot, Endometriosis vs Other Ovarian Carcinomas (GSE29175)", 
+#    filename='gse29175.volcano.svg'
+#    )
+#df29175.hv <- plotHeatmap(df29175, gse29175.s, 
+#    colormap=color.map.gse29175.type,
+#    title = '29175',
+#    filename = 'gse29175.heatmap.svg'
+#    )
+#df29175.hvb <- plotBildDirectionality(df29175, gse29175.s, color.map.gse29175.type,
+#    title = '29175 Bild Sorted',
+#    filename = 'gse29175.bild.sorted.svg'
+#    )
+#df29175.out<-df29175[,c('p.value', 'FC')] 
+#df29175.out$id <- dimnames(df29175.out)[[1]] #row
 
 ## Processing GSE29450 #already log2-converted
 df29450 <- gse29450.src[,gse29450.s.sort$geo_accession]    
@@ -896,13 +908,13 @@ df29450 <- df29450[-which(rownames(df29450) == "1556499_s_at"),]
 endometriosis <- which( 
     str_detect(gse29450.s.sort$characteristics_ch1a, 'clear cell ovarian cancer')  
     ) 
-otherovarian <- which(str_detect(gse29450.s.sort$characteristics_ch1a, 'epithelium'))
+normal <- which(str_detect(gse29450.s.sort$characteristics_ch1a, 'epithelium'))
 ## end of specific subsetting 
-mean.n <- apply(df29450[,endometriosis], 1, mean, na.rm=T)
-mean.t <- apply(df29450[,otherovarian], 1, mean, na.rm=T)
+mean.t <- apply(df29450[,endometriosis], 1, mean, na.rm=T)
+mean.n <- apply(df29450[,normal], 1, mean, na.rm=T)
 p.value <-
-   apply(df29450, 1, func.list$studentT, s1=endometriosis, s2=otherovarian)
-df29450 <- cbind.data.frame(df29450[,endometriosis], df29450[,otherovarian])
+   apply(df29450, 1, func.list$studentT, s1=endometriosis, s2=normal)
+df29450 <- cbind.data.frame(df29450[,endometriosis], df29450[,normal])
 df29450$mean.N <- mean.n
 df29450$mean.T <- mean.t
 df29450$p.value <- p.value
@@ -927,7 +939,7 @@ df29450.out$id <- dimnames(df29450.out)[[1]] #row
 ## Processing GSE30161 #already log2-converted
 df30161 <- gse30161.src[,gse30161.s.sort$geo_accession]
 df30161 <- df30161[-which(rownames(df30161) == "1556499_s_at"),] # outlier
-df30161 <- df30161[-which(rownames(df30161) == "224321_at"),] # outlier
+#df30161 <- df30161[-which(rownames(df30161) == "224321_at"),] # outlier
 ## subsetting part is specific to each dataset (not easily generalizable)
 endometriosis <- rownames(gse30161.s.sort)[
     str_detect(gse30161.s.sort$characteristics_ch1a, 'Clear') | 
@@ -1044,7 +1056,7 @@ pv.df6364 <- apply(df6364, 1, func.list$studentT,
     s2=c(as.character(gse6364.s.sort[c(1:6,10:18,27:32),"geo_accession"]))
 )
 df6364$p.value <- as.numeric(pv.df6364)
-df6364$FC <- df6364$mean.T - df6364$mean.N
+df6364$FC <- df6364$mean.N - df6364$mean.T
 ### Plotting
 plotVolcano(df6364,
     title = "Volcano Plot, Endometriosis vs Normal (GSE6364)",
@@ -1060,6 +1072,40 @@ gse6364.hvb <- plotBildDirectionality(df6364, gse6364.s, color.map.gse6364.type,
     )
 df6364.out<-df6364[,c('p.value', 'FC')] 
 df6364.out$id <- dimnames(df6364.out)[[1]] #row
+
+
+##################################
+#  FINAL BILD ET AL Figure       #                
+##################################
+
+m <- cbind(
+    buildBildMatrix(df7305, color.map.gse7305.type)[[1]],
+    buildDMatrix(df7305, color.map.gse7305.type), 
+    buildDMatrix(df7307, color.map.gse7307.type),
+    buildDMatrix(df6364, color.map.gse6364.type)
+)
+SrcProbes <- buildBildMatrix(df7305, color.map.gse7305.type)[[2]]
+SrcGenes <- unlist(mget(SrcProbes, hgu133plus2SYMBOL))
+rename <- which(is.na(SrcGenes))
+SrcGenes[rename] <- names(SrcGenes)[rename]
+rownames(m) <- SrcGenes
+colnames(m) <- c('Bild et. al', 'GSE7305', 'GSE7307', 'GSE6364')
+bildUp <- m[which(m[,1] == 1),]
+bildDown <- m[which(m[,1] == 2),]
+#now cluster each group:
+dd.row <- as.dendrogram(hclust(dist(bildUp)))
+row.ord <- order.dendrogram(dd.row)
+bildUp <- bildUp[row.ord,]
+dd.row <- as.dendrogram(hclust(dist(bildDown)))
+row.ord <- order.dendrogram(dd.row)
+bildDown <- bildDown[row.ord,]
+final <- (rbind(bildDown, bildUp))
+genes.ord <- rownames(final)
+final <- data.frame(final)
+final$genes <- with(final, factor(genes.ord, levels=genes.ord, ordered=T))
+mfinal <- reshape::melt(final, id.vars="genes")
+plot.here <- ggplot(mfinal, aes(variable, genes, label=value)) +
+      geom_tile(aes(fill=value), color="gray60")
 
 ##################################
 #  FINAL TABLE                   #
