@@ -8,6 +8,9 @@ library(plyr)
 library("hgu133plus2.db") # Affymetrix Human Genome U133 Plus 2.0 Array annotation data
 library("hwgcod.db") # GE/Amersham Codelink Human Whole Genome Bioarray 
 library("hgug4112a.db") # 
+library('reshape')
+library('ggplot2')
+
 options(stringsAsFactors=FALSE)
 ##TODO - get more datasets
 
@@ -154,7 +157,7 @@ options(stringsAsFactors=FALSE)
 #    )
 ####start from here#####
 setwd("/data/htorres/kate")
-load(file="GEOfiles_associated_withENDO.downloaded.April2013.rda")
+load(file="/data/htorres/kate/GEOfiles_associated_withENDO.downloaded.April2013.rda")
 #
 ### New Src signature data frame
 Src.signature = read.table('src_signature.txt', sep='\t') #from Bild et al 2006 suplemental table1
@@ -1077,22 +1080,92 @@ df6364.out$id <- dimnames(df6364.out)[[1]] #row
 ##################################
 #  FINAL BILD ET AL Figure       #                
 ##################################
+#getDVector <- #builds an expression directionality vector for a dataset
+#function(df, colormap) {
+#    bildExpDir <- build.side.map(df)[,1]
+#    up <- which(bildExpDir == 'red')
+#    down <- which(bildExpDir == 'green')
+#    reorderRows <- c( up, down )
+#    df <- df[reorderRows,]
+#    #columns I always want removed:
+#    filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
+#    filterout <-
+#    -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
+#    filtered = df[,filterout]
+#    m <- build.side.map(df)
+#    reverse.map <- function(char){
+#        if ( char == 'red' ) 'upregulated'
+#        else if (char == 'green') 'downregulated'
+#        else 'insignificant'
+#        }
+#    return( unlist(lapply(m[,2], reverse.map)) )
+#    }
+#getBildVector <- #builds an expression directionality vector for a dataset
+#function(df, colormap) {
+#    bildExpDir <- build.side.map(df)[,1]
+#    up <- which(bildExpDir == 'red')
+#    down <- which(bildExpDir == 'green')
+#    reorderRows <- c( up, down )
+#    df <- df[reorderRows,]
+#    #columns I always want removed:
+#    filterout <- c('FC', 'p.value', 'mean.T', 'mean.N')
+#    filterout <-
+#    -1 * unlist(lapply(filterout, function(x){which(colnames(df) == x)} ) )
+#    filtered = df[,filterout]
+#    m <- build.side.map(df)
+#    reverse.map <- function(char){
+#        if ( char == 'red' ) 'upregulated'
+#        else if (char == 'green') 'downregulated'
+#        else 'insignificant'
+#        } 
+#    return( list(unlist(lapply(m[,1], reverse.map)), rownames(df) ) )
+#    }
+#m <- cbind(
+#    getBildVector(df7305, color.map.gse7305.type)[[1]],
+#    getDVector(df7305, color.map.gse7305.type), 
+#    getDVector(df7307, color.map.gse7307.type),
+#    getDVector(df6364, color.map.gse6364.type)
+#    )
+#SrcProbes <- getBildVector(df7305, color.map.gse7305.type)[[2]]
+#SrcGenes <- unlist(mget(SrcProbes, hgu133plus2SYMBOL))
+#rename <- which(is.na(SrcGenes))
+#SrcGenes[rename] <- names(SrcGenes)[rename]
+#rownames(m) <- SrcGenes
+#colnames(m) <- c('Bild et. al', 'GSE7305', 'GSE7307', 'GSE6364')
+#bildUp <- m[which(m[,1] == 'upregulated'),]
+#bildDown <- m[which(m[,1] == 'downregulated'),]
+##now cluster each group:
+#dd.row <- as.dendrogram(hclust(dist(bildUp)))
+#row.ord <- order.dendrogram(dd.row)
+#bildUp <- bildUp[row.ord,]
+#dd.row <- as.dendrogram(hclust(dist(bildDown)))
+#row.ord <- order.dendrogram(dd.row)
+#bildDown <- bildDown[row.ord,]
+#final <- (rbind(bildDown, bildUp))
+#genes.ord <- rownames(final)
+#final <- data.frame(final)
+#final$genes <- with(final, factor(genes.ord, levels=genes.ord, ordered=T))
+#mfinal <- reshape::melt(final, id.vars="genes")
+#plot.here <- ggplot(mfinal, aes(variable, genes, label=value)) +
+#      geom_tile(aes(fill=value), color="gray60")
+#ggsave(plot.here, filename='stacked.pdf')
 
 m <- cbind(
     buildBildMatrix(df7305, color.map.gse7305.type)[[1]],
     buildDMatrix(df7305, color.map.gse7305.type), 
     buildDMatrix(df7307, color.map.gse7307.type),
     buildDMatrix(df6364, color.map.gse6364.type)
-)
+    )
 SrcProbes <- buildBildMatrix(df7305, color.map.gse7305.type)[[2]]
 SrcGenes <- unlist(mget(SrcProbes, hgu133plus2SYMBOL))
 rename <- which(is.na(SrcGenes))
-SrcGenes[rename] <- names(SrcGenes)[rename]
+SrcGenes[rename] <- 'unknown' #names(SrcGenes)[rename]
+SrcGenes <- paste(SrcGenes, '.', names(SrcGenes), sep='')
 rownames(m) <- SrcGenes
 colnames(m) <- c('Bild et. al', 'GSE7305', 'GSE7307', 'GSE6364')
 bildUp <- m[which(m[,1] == 1),]
 bildDown <- m[which(m[,1] == 2),]
-#now cluster each group:
+##now cluster each group:
 dd.row <- as.dendrogram(hclust(dist(bildUp)))
 row.ord <- order.dendrogram(dd.row)
 bildUp <- bildUp[row.ord,]
@@ -1104,22 +1177,26 @@ genes.ord <- rownames(final)
 final <- data.frame(final)
 final$genes <- with(final, factor(genes.ord, levels=genes.ord, ordered=T))
 mfinal <- reshape::melt(final, id.vars="genes")
-plot.here <- ggplot(mfinal, aes(variable, genes, label=value)) +
-      geom_tile(aes(fill=value), color="gray60")
+##Plotting part
+plot.here <- ggplot(mfinal,aes(variable, genes, label=factor(value))) +
+    geom_tile(aes(fill=factor(value))) + 
+    scale_fill_manual(values = c('1'= "red",'0'= "white",'2'="green"))
+ggsave(plot.here, filename="stacked.svg", width=4, height=10)
 
 ##################################
 #  FINAL TABLE                   #
 ##################################
-list.names <- c("df6364.out", "df30161.out", "df29450.out", "df29175.out", "dfTothill.out", "df39204.out", "df7307.out", "df7305.out")
-list.objects <- list(df6364.out, df30161.out, df29450.out, df29175.out, dfTothill.out, df39204.out, df7307.out, df7305.out)
-names(list.objects) <- list.names
-for ( i in list.names ) {
-    final.table <- merge(Src.signature.out, list.objects[[i]], by.x='ProbeID', by.y='id', all.x=T)
-    write.table(final.table, 
-                file=paste(i, '.txt', sep=''), 
-                quote=F, row.names=F, sep='\t'
-                )
-    }
+#list.names <- c("df6364.out", "df30161.out", "df29450.out", "df29175.out", "dfTothill.out", "df39204.out", "df7307.out", "df7305.out")
+#list.objects <- list(df6364.out, df30161.out, df29450.out, df29175.out, dfTothill.out, df39204.out, df7307.out, df7305.out)
+#names(list.objects) <- list.names
+#for ( i in list.names ) {
+#    final.table <- merge(Src.signature.out, list.objects[[i]], by.x='ProbeID', by.y='id', all.x=T)
+#    write.table(final.table, 
+#                file=paste(i, '.txt', sep=''), 
+#                quote=F, row.names=F, sep='\t'
+#                )
+#    }
+#
 ###################################
 #### NON-AFFY U133 v2.0 DATASETS  #
 ###################################
