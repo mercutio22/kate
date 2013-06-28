@@ -167,7 +167,10 @@ Src.signature$logFC <- log2(Src.signature$FoldChange)
 Src.signature$direction <- NA
 Src.signature$direction[Src.signature$logFC<0] <- c("DN.BILD") # just to denote this info is not from our analysis (BILD) 
 Src.signature$direction[Src.signature$logFC>0] <- c("UP.BILD")
-
+#I will use oldSymbols in the final manifest table.
+oldSymbols = as.data.frame(
+    Src.signature$GeneSymbol, 
+    row.names= Src.signature$ProbeID)
 #update Src.signature with updated gene symbols from the bioconductor bimap
 Src.signature$GeneSymbol <- unlist(
     mget(Src.signature$ProbeID, hgu133plus2SYMBOL, ifnotfound=NA), 
@@ -227,7 +230,7 @@ sort.data.frame <- function(x, key, ...) {
 	}
 }
 
-###cleanup sample manifest #metadata) # WARNING: I Don't understand this section
+###cleanup sample manifest #metadata) 
 #further code expects every manifest dataframe (df.s) to contain a characteristics_ch1a column
 tothill.s$characteristics_ch1a <- tothill.s$characteristics_ch1.2
 gse6008.nn <- strsplit(as.character(gse6008.s$characteristics_ch1), ": ")
@@ -1184,19 +1187,97 @@ plot.here <- ggplot(mfinal,aes(variable, genes, label=factor(value))) +
 ggsave(plot.here, filename="stacked.svg", width=4, height=10)
 
 ##################################
+##  FISHER's EXACT TEST         ##
+##################################
+# 0 <- insignificant
+# 1 <- upregulated
+# 2 <- downregulated
+
+##contingency matrixes:
+
+gse7305Contingency <- as.matrix( table(bild=m[,1], gse7305=m[,2]) )
+gse7307Contingency <- as.matrix( table(bild=m[,1], gse7307=m[,3]) ) 
+gse6364Contingency <- as.matrix( table(bild=m[,1], gse6364=m[,4]) )
+
+##pure
+FTgse7305 <- fisher.test(gse7305Contingency)
+FTgse7307 <- fisher.test(gse7307Contingency)
+FTgse6364 <- fisher.test(gse6364Contingency)
+
+##removing insignificants
+gse7305Contingency <- as.matrix( table(bild=m[,1], gse7305=m[,2])[,-1] )
+gse7307Contingency <- as.matrix( table(bild=m[,1], gse7307=m[,3])[,-1] )
+gse6364Contingency <- as.matrix( table(bild=m[,1], gse6364=m[,4])[,-1] )
+FTgse7305sigOnly <- fisher.test(gse7305Contingency)
+FTgse7307sigOnly <- fisher.test(gse7307Contingency)
+FTgse6364sigOnly <- fisher.test(gse6364Contingency)
+
+## removing SRC gene
+mNoSrc <- m[-which( str_detect(rownames(m), 'SRC') ),]
+gse7305Contingency <- as.matrix( table(bild=mNoSrc[,1], gse7305=mNoSrc[,2]) )
+gse7307Contingency <- as.matrix( table(bild=mNoSrc[,1], gse7307=mNoSrc[,3]) ) 
+gse6364Contingency <- as.matrix( table(bild=mNoSrc[,1], gse6364=mNoSrc[,4]) ) 
+FTgse7305NoSrc <- fisher.test(gse7305Contingency)
+FTgse7307NoSrc <- fisher.test(gse7307Contingency)
+FTgse6364NoSrc <- fisher.test(gse6364Contingency)
+
+##removing insignificants
+gse7305Contingency <- as.matrix( table(bild=mNoSrc[,1], gse7305=mNoSrc[,2])[,-1] )
+gse7307Contingency <- as.matrix( table(bild=mNoSrc[,1], gse7307=mNoSrc[,3])[,-1] )
+gse6364Contingency <- as.matrix( table(bild=mNoSrc[,1], gse6364=mNoSrc[,4])[,-1] )
+FTgse7305NoSrcSigOnly <- fisher.test(gse7305Contingency)
+FTgse7307NoSrcSigOnly <- fisher.test(gse7307Contingency)
+FTgse6364NoSrcSigOnly <- fisher.test(gse6364Contingency)
+
+##################################
 #  FINAL TABLE                   #
 ##################################
-#list.names <- c("df6364.out", "df30161.out", "df29450.out", "df29175.out", "dfTothill.out", "df39204.out", "df7307.out", "df7305.out")
-#list.objects <- list(df6364.out, df30161.out, df29450.out, df29175.out, dfTothill.out, df39204.out, df7307.out, df7305.out)
-#names(list.objects) <- list.names
-#for ( i in list.names ) {
-#    final.table <- merge(Src.signature.out, list.objects[[i]], by.x='ProbeID', by.y='id', all.x=T)
-#    write.table(final.table, 
-#                file=paste(i, '.txt', sep=''), 
-#                quote=F, row.names=F, sep='\t'
-#                )
-#    }
-#
+list.names <- c(
+    "df6364.out", 
+#    "df30161.out", 
+#    "df29450.out", 
+#    "df29175.out", 
+#    "dfTothill.out", 
+#    "df39204.out", 
+    "df7307.out", 
+    "df7305.out")
+list.objects <- list(
+    df6364.out, 
+    #df30161.out, 
+    #df29450.out, 
+    #df29175.out, 
+    #dfTothill.out, 
+    #df39204.out, 
+    df7307.out, 
+    df7305.out)
+names(list.objects) <- list.names
+for ( i in list.names ) {
+    final.table <- merge(
+        Src.signature.out, 
+        list.objects[[i]], 
+        by.x='ProbeID', 
+        by.y='id', 
+        all.x=T)
+    #merge seems to reorder symbols so I have to reorder and add the oldSymbols
+    oldSymbolsReordered <- oldSymbols[final.table$ProbeID,]
+    final.table <- cbind(final.table, oldSymbolsReordered)[,c(1,6,2,3,4,5)]
+    write.table(final.table, 
+                file=paste(i, '.txt', sep=''), 
+                quote=F, row.names=F, sep='\t'
+                )
+    }
+
+
+###################################
+# MANIFEST TABLE                  #
+###################################
+
+c7305 <- build.top.map(df7305, gse7305.s.sort, color.map.gse7305.type)[,1]
+c7307 <- build.top.map(df7307, gse7305.s.sort, color.map.gse7307.type)[,1]
+c6364 <- build.top.map(df6364, gse6364.s.sort, color.map.gse6364.type)[,1]
+
+
+
 ###################################
 #### NON-AFFY U133 v2.0 DATASETS  #
 ###################################
@@ -1252,5 +1333,4 @@ ggsave(plot.here, filename="stacked.svg", width=4, height=10)
 #    title='GSE37837',
 #    filename='gse37837.heatmap.svg'
 #    )
-#endometriosis
 #endometriosis
