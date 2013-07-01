@@ -1229,6 +1229,28 @@ FTgse7305NoSrcSigOnly <- fisher.test(gse7305Contingency)
 FTgse7307NoSrcSigOnly <- fisher.test(gse7307Contingency)
 FTgse6364NoSrcSigOnly <- fisher.test(gse6364Contingency)
 
+c7305 <- build.top.map(df7305, gse7305.s.sort, color.map.gse7305.type)[,1]
+
+### Houtan's Merging Magic
+#R » md <- matrix( c(4, 1, 10, 28), nrow=2, ncol=2, byrow=T) 
+#R » md
+#     [,1] [,2]
+#[1,]    4    1
+#[2,]   10   28
+#R » fisher.test(md)
+#
+#        Fisher's Exact Test for Count Data
+#
+#data:  md
+#p-value = 0.03224
+#alternative hypothesis: true odds ratio is not equal to 1
+#95 percent confidence interval:
+#   0.9027 568.4862
+#sample estimates:
+#odds ratio 
+#      10.5 
+
+
 ##################################
 #  FINAL TABLE                   #
 ##################################
